@@ -22,14 +22,13 @@ Correct endpoints without the intermediate links are **not** treated as confirma
 
 ## Contents
 
-- `00_Cover_Note_to_Tom.txt` — ready-to-send informal cover note.
-- `01_From_Thesis_to_Test.docx` — the working paper and research protocol.
-- `02_README.md` — this file.
-- `03_luongo_model_test.py` — public-data collection, parsing, panels, charts, event study, regressions, and scorecard.
-- `04_requirements.txt` — Python dependencies.
-- `05_events_template.csv` — candidate event dates; Tom should verify, add, or delete before formal testing.
-- `06_optional_market_data_template.csv` — schema for cross-currency basis, CDS, repo, actual return and funding inputs.
-- `07_data_dictionary.csv` — variable definitions, sources, roles, and warnings.
+- `From_Thesis_to_Test.docx` — the working paper and research protocol.
+- `README.md` — this file.
+- `luongo_model_test.py` — public-data collection, parsing, panels, charts, event study, regressions, and scorecard.
+- `requirements.txt` — Python dependencies.
+- `events_template.csv` — candidate event dates; Tom should verify, add, or delete before formal testing.
+- `optional_market_data_template.csv` — schema for cross-currency basis, CDS, repo, actual return and funding inputs.
+- `data_dictionary.csv` — variable definitions, sources, roles, and warnings.
 - `data/raw/` — public snapshots used to verify the MOF, CFTC, and TIC parsers offline.
 - `outputs_example/offline/` — parser outputs from the bundled snapshots. These are **not model results**.
 
@@ -74,13 +73,13 @@ Python 3.11 or newer is recommended.
 ```bash
 python -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
-pip install -r 04_requirements.txt
+pip install -r requirements.txt
 ```
 
 ## First run: verify the bundled parsers offline
 
 ```bash
-python 03_luongo_model_test.py \
+python luongo_model_test.py \
   --offline-snapshots \
   --output outputs/offline
 ```
@@ -95,7 +94,7 @@ This checks the current-week CFTC TFF text, Japan MOF weekly flow CSV, and Treas
 ## Public-data baseline
 
 ```bash
-python 03_luongo_model_test.py \
+python luongo_model_test.py \
   --start 2006-01-01 \
   --events 05_events_template.csv \
   --output outputs/public_baseline
@@ -115,13 +114,13 @@ No API key is normally required for these endpoints. Public sites can rate-limit
 Copy the optional template, populate it from Bloomberg, Refinitiv, ICE, CME, dealer runs, or another consistent vendor, and preserve the units and sign conventions:
 
 ```bash
-cp 06_optional_market_data_template.csv data/optional_market_data.csv
+cp optional_market_data_template.csv data/optional_market_data.csv
 ```
 
 Then run:
 
 ```bash
-python 03_luongo_model_test.py \
+python luongo_model_test.py \
   --start 2006-01-01 \
   --events 05_events_template.csv \
   --optional-market-data data/optional_market_data.csv \
