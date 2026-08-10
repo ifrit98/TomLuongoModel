@@ -1,0 +1,5 @@
+event_date,event_type,expected_direction,claimed_mechanism,source_note
+2024-03-19,BOJ regime shift,hawkish,End negative-rate framework; candidate first-stage event,Verify announcement timestamp before intraday work
+2024-07-31,BOJ policy decision,hawkish,Raise policy rate and reduce accommodation; candidate event,Verify expected-versus-surprise component
+2026-06-16,BOJ policy decision,hawkish,Policy-rate normalization relevant to August 2026 thesis,Official BOJ decision; freeze exact time and consensus surprise
+,US-Japan support operation,,Specify spot FX vs dollar swap vs repo/credit,Tom to identify exact instrument date amount and executing institution

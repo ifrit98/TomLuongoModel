@@ -1,0 +1,19 @@
+field,frequency,unit,preferred_source,role,interpretation_warning
+jpy_per_usd,daily,JPY per USD,FRED DEXJPUS,FX leg,Higher means weaker yen
+usd_per_eur,daily,USD per EUR,FRED DEXUSEU,FX leg,Combine with JPY/USD to derive JPY/EUR
+jpy_per_eur,daily,JPY per EUR,Derived,Economic FX exposure,Yen appreciation means this falls
+dejp_10y_bp,monthly/daily,basis points,FRED/OECD or vendor,Raw diagnostic,Not executable covered carry
+eurjpy_xccy_basis_bp,daily/intraday,basis points,Bloomberg/Refinitiv/vendor,Covered funding cost,Confirm vendor sign convention
+europe_asset_return_ann_pct,daily/monthly,percent annualized,Vendor or constructed,Return leg,Must include price return roll and coupons
+eur_funding_ann_pct,daily/monthly,percent annualized,ESTR/OIS or actual funding,Funding leg,Match tenor to asset/hedge
+all_in_costs_ann_bp,daily/monthly,basis points,Institution estimate,Capital/repo/transaction costs,Can dominate a 30 bp gross spread
+lev_net_share_oi,weekly,share of open interest,CFTC TFF,Public positioning proxy,Does not capture OTC or all institutions
+resident_foreign_long_debt_net_100m_yen,weekly,100 million yen,Japan MOF,Repatriation proxy,Aggregate flow lacks country and currency detail
+for_treas_pos,monthly,USD millions,Treasury TIC,Foreign Treasury holdings,Residence/custody is not ultimate beneficial owner
+btp_bund_bp,daily/monthly,basis points,Vendor/FRED,European fragmentation proxy,ECB backstop expectations may suppress it
+euro_bank_cds_bp,daily,basis points,Vendor,European bank stress,Premium data usually required
+sofr_minus_iorb_bp,daily,basis points,FRED,Secured dollar funding proxy,Not a complete dollar-funding index
+fed_swap_lines,weekly,USD millions,FRED SWPT,Fed swap usage,Facility size and outstanding drawings differ
+gold_return,daily,log return,FRED/LBMA,Collateral response,Gold up alone cannot identify repair vs debasement
+broad_usd_return,daily,log return,FRED DTWEXBGS,Regime discriminator,Luongo repair allows gold and dollar to rise together
+hy_oas,daily,percentage points,FRED,General credit stress,Use changes and event windows

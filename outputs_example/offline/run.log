@@ -1,0 +1,2 @@
+2026-08-10 02:03:27,658 | INFO | Running offline snapshot parser checks
+2026-08-10 02:03:28,254 | INFO | Offline parser checks passed: {'cftc_rows': 1, 'mof_rows': 1109, 'tic_rows': 7007, 'tic_latest_date': '2026-05-01'}
