@@ -1,0 +1,48 @@
+{
+  "generated_at_utc": "2026-08-10T15:33:11Z",
+  "arguments": {
+    "start": "2006-01-01",
+    "end": "2026-08-10",
+    "output": "outputs/public_baseline",
+    "events": "events_template.csv",
+    "optional_market_data": null,
+    "fred_api_key": "10888e4b9dd830b8b5c214a74f563bb1",
+    "fred_source": "auto",
+    "fred_timeout": 15,
+    "fred_retries": 2,
+    "fred_fail_fast": true,
+    "offline_snapshots": false,
+    "verbose": false
+  },
+  "source_status": {
+    "fred:jpy_per_usd": "loaded (FRED API:DEXJPUS)",
+    "fred:usd_per_eur": "loaded (FRED API:DEXUSEU)",
+    "fred:gold_usd": "loaded (FRED API:NASDAQQGLDI)",
+    "fred:broad_usd": "loaded (FRED API:DTWEXBGS)",
+    "fred:us10": "loaded (FRED API:DGS10)",
+    "fred:us10_real": "loaded (FRED API:DFII10)",
+    "fred:us10_breakeven": "loaded (FRED API:T10YIE)",
+    "fred:sofr": "loaded (FRED API:SOFR)",
+    "fred:iorb": "loaded (FRED API:IORB)",
+    "fred:fed_assets": "loaded (FRED API:WALCL)",
+    "fred:m2": "loaded (FRED API:M2SL)",
+    "fred:fed_swap_lines": "loaded (FRED API:SWPT)",
+    "fred:vix": "loaded (FRED API:VIXCLS)",
+    "fred:hy_oas": "loaded (FRED API:BAMLH0A0HYM2)",
+    "fred:jp10": "loaded (FRED API:IRLTLT01JPM156N)",
+    "fred:de10": "loaded (FRED API:IRLTLT01DEM156N)",
+    "fred:it10": "loaded (FRED API:IRLTLT01ITM156N)",
+    "fred:uk10": "loaded (FRED API:IRLTLT01GBM156N)",
+    "fred:ecb_deposit_rate": "loaded (FRED API:ECBDFR)",
+    "cftc": "downloaded",
+    "mof": "downloaded",
+    "tic": "downloaded",
+    "optional_market_data": "not supplied or empty"
+  },
+  "important_interpretation": [
+    "Raw sovereign-yield spreads are diagnostics, not executable carry.",
+    "Covered carry requires forward/basis/funding/repo/cost inputs.",
+    "Price sequencing cannot by itself identify policymaker intent.",
+    "TIC is primarily residence/custody based and does not always reveal ultimate owners."
+  ]
+}

@@ -41,11 +41,12 @@ import io
 import json
 import logging
 import math
+import os
 import re
 import sys
 import time
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
@@ -64,6 +65,7 @@ LOGGER = logging.getLogger("luongo_test")
 USER_AGENT = "LuongoModelTest/1.0 (public-data research scaffold)"
 
 FRED_GRAPH_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
 CFTC_TFF_URL = "https://publicreporting.cftc.gov/resource/gpe5-46if.csv"
 MOF_WEEKLY_URL = (
     "https://www.mof.go.jp/policy/international_policy/reference/"
@@ -81,7 +83,10 @@ FRED_SERIES: dict[str, str] = {
     # FX and hard collateral
     "jpy_per_usd": "DEXJPUS",
     "usd_per_eur": "DEXUSEU",
-    "gold_usd": "GOLDAMGBD228NLBM",
+    # FRED no longer serves the old LBMA fixing series through the API.
+    # Use the current daily Credit Suisse/Nasdaq gold price index as a RETURN proxy.
+    # This is not a spot-gold level and should not be interpreted as $/oz.
+    "gold_usd": "NASDAQQGLDI",
     "broad_usd": "DTWEXBGS",
     # U.S. rates, liquidity and risk
     "us10": "DGS10",
@@ -116,6 +121,14 @@ class SourceUnavailable(RuntimeError):
     """Raised when a public source cannot be fetched or parsed."""
 
 
+class HostUnavailable(SourceUnavailable):
+    """Raised for timeout/connection/server failures that can affect a whole host."""
+
+
+class ResourceUnavailable(SourceUnavailable):
+    """Raised when one requested resource/series is rejected or does not exist."""
+
+
 def configure_logging(output_dir: Path, verbose: bool = False) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     level = logging.DEBUG if verbose else logging.INFO
@@ -136,8 +149,13 @@ def request_bytes(
     retries: int = 4,
     timeout: int = 45,
 ) -> bytes:
-    """Fetch bytes with retries and an explicit user agent."""
-    last_error: Exception | None = None
+    """Fetch bytes with retries while keeping credentials out of logs.
+
+    4xx errors such as an invalid FRED series are resource-level failures and
+    must NOT trip the host circuit breaker. Timeouts, connection failures,
+    rate limiting, and 5xx responses may be transient and are retried.
+    """
+    last_error: str | None = None
     for attempt in range(retries):
         try:
             response = requests.get(
@@ -146,21 +164,61 @@ def request_bytes(
                 timeout=timeout,
                 headers={"User-Agent": USER_AGENT},
             )
-            response.raise_for_status()
-            return response.content
-        except requests.RequestException as exc:
-            last_error = exc
-            sleep_s = 2**attempt
+
+            status = response.status_code
+            if 200 <= status < 300:
+                return response.content
+
+            # Do not retry permanent client/resource errors. Crucially, do not
+            # stringify requests.HTTPError because it includes response.url and
+            # therefore API keys passed in the query string.
+            if 400 <= status < 500 and status != 429:
+                detail = response.text.strip().replace("\n", " ")[:300]
+                LOGGER.warning(
+                    "Fetch rejected (%s, HTTP %d)%s",
+                    url,
+                    status,
+                    f": {detail}" if detail else "",
+                )
+                raise ResourceUnavailable(
+                    f"HTTP {status} for {url}" + (f": {detail}" if detail else "")
+                )
+
+            # 429 and 5xx are potentially transient service/host failures.
+            last_error = f"HTTP {status}"
+            LOGGER.warning(
+                "Fetch failed (%s, attempt %d/%d): HTTP %d",
+                url,
+                attempt + 1,
+                retries,
+                status,
+            )
+        except ResourceUnavailable:
+            raise
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
             LOGGER.warning(
                 "Fetch failed (%s, attempt %d/%d): %s",
                 url,
                 attempt + 1,
                 retries,
-                exc,
+                last_error,
             )
-            if attempt + 1 < retries:
-                time.sleep(sleep_s)
-    raise SourceUnavailable(f"Unable to fetch {url}: {last_error}")
+        except requests.RequestException as exc:
+            # Other requests-layer failures are logged without the prepared URL.
+            last_error = f"{type(exc).__name__}: {exc.__class__.__name__}"
+            LOGGER.warning(
+                "Fetch failed (%s, attempt %d/%d): %s",
+                url,
+                attempt + 1,
+                retries,
+                last_error,
+            )
+
+        if attempt + 1 < retries:
+            time.sleep(2**attempt)
+
+    raise HostUnavailable(f"Unable to fetch {url}: {last_error}")
 
 
 def write_raw_cache(raw_dir: Path, name: str, content: bytes) -> Path:
@@ -180,55 +238,232 @@ def clean_numeric(series: pd.Series) -> pd.Series:
     )
 
 
+def _pick_column(frame: pd.DataFrame, candidates: Sequence[str]) -> str | None:
+    """Return the first matching column name from a list of schema candidates.
+
+    Public-data APIs occasionally alter capitalization or punctuation in field
+    names.  Prefer exact matches, then fall back to a conservative normalized
+    comparison so minor schema changes do not crash the run.
+    """
+    for candidate in candidates:
+        if candidate in frame.columns:
+            return candidate
+
+    def normalize(value: object) -> str:
+        return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+    normalized = {normalize(column): column for column in frame.columns}
+    for candidate in candidates:
+        match = normalized.get(normalize(candidate))
+        if match is not None:
+            return match
+    return None
+
+
+def _parse_fred_graph_csv(content: bytes, alias: str, series_id: str) -> pd.DataFrame:
+    frame = pd.read_csv(io.BytesIO(content))
+    if frame.shape[1] < 2:
+        raise SourceUnavailable(f"Unexpected FRED graph schema for {series_id}")
+    date_col, value_col = frame.columns[:2]
+    frame = frame.rename(columns={date_col: "date", value_col: alias})
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame[alias] = pd.to_numeric(frame[alias], errors="coerce")
+    return frame.dropna(subset=["date"]).set_index("date").sort_index()[[alias]]
+
+
+def _parse_fred_api_json(content: bytes, alias: str, series_id: str) -> pd.DataFrame:
+    try:
+        payload = json.loads(content.decode("utf-8"))
+        observations = payload["observations"]
+    except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise SourceUnavailable(f"Unexpected FRED API response for {series_id}: {exc}") from exc
+    frame = pd.DataFrame(observations)
+    if frame.empty or not {"date", "value"}.issubset(frame.columns):
+        raise SourceUnavailable(f"No observations returned by FRED API for {series_id}")
+    frame = frame.rename(columns={"value": alias})
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame[alias] = pd.to_numeric(frame[alias], errors="coerce")
+    return frame.dropna(subset=["date"]).set_index("date").sort_index()[[alias]]
+
+
 def fetch_fred_series(
     alias: str,
     series_id: str,
     start: str,
     end: str,
     raw_dir: Path,
+    *,
+    api_key: str | None = None,
+    source: str = "auto",
+    timeout: int = 15,
+    retries: int = 2,
 ) -> FetchResult:
-    params = {"id": series_id, "cosd": start, "coed": end}
-    content = request_bytes(FRED_GRAPH_URL, params=params)
-    cached = write_raw_cache(raw_dir, f"fred_{series_id}.csv", content)
-    frame = pd.read_csv(io.BytesIO(content))
-    if frame.shape[1] < 2:
-        raise SourceUnavailable(f"Unexpected FRED schema for {series_id}")
-    date_col, value_col = frame.columns[:2]
-    frame = frame.rename(columns={date_col: "date", value_col: alias})
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
-    frame[alias] = pd.to_numeric(frame[alias], errors="coerce")
-    frame = frame.dropna(subset=["date"]).set_index("date").sort_index()
-    return FetchResult(alias, frame[[alias]], f"FRED:{series_id}", cached)
+    """Fetch one FRED series.
+
+    Preferred path is the official FRED API when an API key is supplied.
+    The no-key fredgraph CSV endpoint remains as a convenience fallback.
+    On network failure, an existing raw cache is used if available.
+    """
+    cache_csv = raw_dir / f"fred_{series_id}.csv"
+    errors: list[str] = []
+
+    use_api = source == "api" or (source == "auto" and bool(api_key))
+    use_graph = source == "graph" or (source == "auto" and not api_key)
+
+    if use_api:
+        if not api_key:
+            raise SourceUnavailable(
+                "FRED API selected but no API key supplied. Set FRED_API_KEY or use --fred-source graph."
+            )
+        params = {
+            "series_id": series_id,
+            "api_key": api_key,
+            "file_type": "json",
+            "observation_start": start,
+            "observation_end": end,
+            "sort_order": "asc",
+            "limit": "100000",
+        }
+        try:
+            content = request_bytes(
+                FRED_API_URL, params=params, retries=retries, timeout=timeout
+            )
+            frame = _parse_fred_api_json(content, alias, series_id)
+            # Save a normalized CSV so later reruns can proceed from cache.
+            raw_dir.mkdir(parents=True, exist_ok=True)
+            frame.reset_index().to_csv(cache_csv, index=False)
+            return FetchResult(alias, frame, f"FRED API:{series_id}", cache_csv)
+        except ResourceUnavailable as exc:
+            # A 4xx response is specific to this series/request. It is not a
+            # FRED host outage, so do not fall through to the graph host and do
+            # not trip the host-level circuit breaker.
+            errors.append(f"API resource: {exc}")
+            if cache_csv.exists():
+                frame = _parse_fred_graph_csv(cache_csv.read_bytes(), alias, series_id)
+                LOGGER.warning("Using cached FRED %s after API resource failure", series_id)
+                return FetchResult(alias, frame, f"FRED cache:{series_id}", cache_csv)
+            raise
+        except HostUnavailable as exc:
+            errors.append(f"API host: {exc}")
+            if source == "api":
+                if cache_csv.exists():
+                    frame = _parse_fred_graph_csv(cache_csv.read_bytes(), alias, series_id)
+                    LOGGER.warning("Using cached FRED %s after API host failure", series_id)
+                    return FetchResult(alias, frame, f"FRED cache:{series_id}", cache_csv)
+                raise
+            # In auto mode, only a host/network problem merits trying the
+            # graph endpoint as an alternate transport.
+            use_graph = True
+        except SourceUnavailable as exc:
+            errors.append(f"API parse: {exc}")
+            if cache_csv.exists():
+                frame = _parse_fred_graph_csv(cache_csv.read_bytes(), alias, series_id)
+                LOGGER.warning("Using cached FRED %s after API parse failure", series_id)
+                return FetchResult(alias, frame, f"FRED cache:{series_id}", cache_csv)
+            raise
+
+    if use_graph:
+        params = {"id": series_id, "cosd": start, "coed": end}
+        try:
+            content = request_bytes(
+                FRED_GRAPH_URL, params=params, retries=retries, timeout=timeout
+            )
+            frame = _parse_fred_graph_csv(content, alias, series_id)
+            cached = write_raw_cache(raw_dir, f"fred_{series_id}.csv", content)
+            return FetchResult(alias, frame, f"FRED graph:{series_id}", cached)
+        except ResourceUnavailable as exc:
+            errors.append(f"graph resource: {exc}")
+        except HostUnavailable as exc:
+            errors.append(f"graph host: {exc}")
+            raise
+        except SourceUnavailable as exc:
+            errors.append(f"graph parse: {exc}")
+
+    if cache_csv.exists():
+        try:
+            frame = _parse_fred_graph_csv(cache_csv.read_bytes(), alias, series_id)
+            LOGGER.warning("Using cached FRED %s after network failure", series_id)
+            return FetchResult(alias, frame, f"FRED cache:{series_id}", cache_csv)
+        except Exception as exc:  # cache corruption should not hide the network error
+            errors.append(f"cache: {exc}")
+
+    raise SourceUnavailable("; ".join(errors) or f"Unable to fetch FRED {series_id}")
 
 
 def fetch_all_fred(
     start: str,
     end: str,
     raw_dir: Path,
+    *,
+    api_key: str | None = None,
+    source: str = "auto",
+    timeout: int = 15,
+    retries: int = 2,
+    fail_fast: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     frames: list[pd.DataFrame] = []
     status: dict[str, str] = {}
-    for alias, series_id in FRED_SERIES.items():
+    fred_host_failed = False
+
+    if source == "auto":
+        effective = "official API" if api_key else "no-key graph CSV fallback"
+        LOGGER.info("FRED source: %s", effective)
+    elif source == "api":
+        LOGGER.info("FRED source: official API")
+    else:
+        LOGGER.info("FRED source: graph CSV fallback")
+
+    aliases = list(FRED_SERIES.items())
+    for idx, (alias, series_id) in enumerate(aliases):
+        if fred_host_failed:
+            status[alias] = "skipped after FRED host/network failure"
+            continue
         try:
-            result = fetch_fred_series(alias, series_id, start, end, raw_dir)
+            result = fetch_fred_series(
+                alias,
+                series_id,
+                start,
+                end,
+                raw_dir,
+                api_key=api_key,
+                source=source,
+                timeout=timeout,
+                retries=retries,
+            )
             frames.append(result.frame)
-            status[alias] = "downloaded"
-            LOGGER.info("Downloaded FRED %s (%s)", alias, series_id)
+            status[alias] = f"loaded ({result.source})"
+            LOGGER.info("Loaded FRED %s (%s)", alias, series_id)
+        except ResourceUnavailable as exc:
+            status[alias] = f"resource unavailable: {exc}"
+            LOGGER.warning(
+                "Skipping FRED %s (%s): series/request unavailable; continuing with remaining series",
+                alias,
+                series_id,
+            )
+        except HostUnavailable as exc:
+            status[alias] = f"host unavailable: {exc}"
+            LOGGER.warning("Skipping FRED %s after host/network failure: %s", alias, exc)
+            if fail_fast:
+                fred_host_failed = True
+                remaining = len(aliases) - idx - 1
+                if remaining:
+                    LOGGER.warning(
+                        "FRED circuit breaker opened after host/network failure; "
+                        "skipping %d remaining FRED requests. Use --no-fred-fail-fast "
+                        "only if you intentionally want every series retried.",
+                        remaining,
+                    )
         except SourceUnavailable as exc:
             status[alias] = f"unavailable: {exc}"
-            LOGGER.warning("Skipping FRED %s: %s", alias, exc)
+            LOGGER.warning(
+                "Skipping FRED %s (%s): parse/data failure; continuing with remaining series",
+                alias,
+                series_id,
+            )
+
     if not frames:
         return pd.DataFrame(), status
-    panel = pd.concat(frames, axis=1).sort_index()
-    return panel, status
-
-
-def _pick_column(frame: pd.DataFrame, candidates: Sequence[str]) -> str | None:
-    normalized = {c.lower(): c for c in frame.columns}
-    for candidate in candidates:
-        if candidate.lower() in normalized:
-            return normalized[candidate.lower()]
-    return None
+    return pd.concat(frames, axis=1).sort_index(), status
 
 
 def fetch_cftc_jpy(start: str, raw_dir: Path) -> FetchResult:
@@ -847,7 +1082,7 @@ def write_metadata(
     source_status: Mapping[str, str],
 ) -> None:
     metadata = {
-        "generated_at_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "arguments": vars(args),
         "source_status": dict(source_status),
         "important_interpretation": [
@@ -916,7 +1151,16 @@ def live_run(args: argparse.Namespace, package_dir: Path, output_dir: Path) -> N
     raw_dir = output_dir / "raw_cache"
     source_status: dict[str, str] = {}
 
-    fred, fred_status = fetch_all_fred(args.start, args.end, raw_dir)
+    fred, fred_status = fetch_all_fred(
+        args.start,
+        args.end,
+        raw_dir,
+        api_key=args.fred_api_key,
+        source=args.fred_source,
+        timeout=args.fred_timeout,
+        retries=args.fred_retries,
+        fail_fast=args.fred_fail_fast,
+    )
     source_status.update({f"fred:{k}": v for k, v in fred_status.items()})
 
     try:
@@ -1004,6 +1248,36 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional cross-currency basis/CDS/repo/return CSV.",
     )
+    parser.add_argument(
+        "--fred-api-key",
+        default=os.getenv("FRED_API_KEY"),
+        help="FRED API key. Defaults to the FRED_API_KEY environment variable.",
+    )
+    parser.add_argument(
+        "--fred-source",
+        choices=["auto", "api", "graph"],
+        default="auto",
+        help="FRED transport: auto prefers official API when a key is available; otherwise graph CSV.",
+    )
+    parser.add_argument(
+        "--fred-timeout",
+        type=int,
+        default=15,
+        help="Read timeout in seconds for each FRED request (default: 15).",
+    )
+    parser.add_argument(
+        "--fred-retries",
+        type=int,
+        default=2,
+        help="Attempts per FRED request (default: 2).",
+    )
+    parser.add_argument(
+        "--no-fred-fail-fast",
+        dest="fred_fail_fast",
+        action="store_false",
+        help="Retry every FRED series even after the first host/network failure.",
+    )
+    parser.set_defaults(fred_fail_fast=True)
     parser.add_argument(
         "--offline-snapshots",
         action="store_true",

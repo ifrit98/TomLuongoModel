@@ -1,0 +1,85 @@
+2026-08-10 09:49:08,798 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:49:43,753 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:50:30,899 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:51:20,047 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:51:20,048 | WARNING | Skipping FRED jpy_per_usd: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:51:59,223 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:52:45,496 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:53:29,230 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:54:18,379 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:54:18,381 | WARNING | Skipping FRED usd_per_eur: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:55:03,555 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:55:49,766 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:56:36,931 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:57:26,078 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:57:26,079 | WARNING | Skipping FRED gold_usd: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:58:11,230 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:58:57,438 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 09:59:44,601 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:00:33,759 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:00:33,760 | WARNING | Skipping FRED broad_usd: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:01:08,781 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:01:54,980 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:02:28,905 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:03:18,103 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:03:18,104 | WARNING | Skipping FRED us10: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:04:03,304 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:04:49,473 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:05:36,640 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:06:25,802 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:06:25,803 | WARNING | Skipping FRED us10_real: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:07:10,956 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:07:49,586 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:08:36,788 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 3/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:09:26,059 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 4/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:09:26,059 | WARNING | Skipping FRED us10_breakeven: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:10:11,218 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/4): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=45)
+2026-08-10 10:33:52,810 | INFO | FRED source: no-key graph CSV fallback
+2026-08-10 10:34:08,142 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:34:24,283 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:34:24,283 | WARNING | Skipping FRED jpy_per_usd: graph: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:34:24,284 | WARNING | FRED circuit breaker opened after first failed series; skipping 18 remaining FRED requests. Set FRED_API_KEY to use the official API, or rerun with --no-fred-fail-fast if you intentionally want every series retried.
+2026-08-10 10:39:14,832 | INFO | FRED source: no-key graph CSV fallback
+2026-08-10 10:39:22,188 | INFO | FRED source: no-key graph CSV fallback
+2026-08-10 10:39:37,282 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:39:53,393 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:39:53,394 | WARNING | Skipping FRED jpy_per_usd: graph: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:39:53,394 | WARNING | FRED circuit breaker opened after first failed series; skipping 18 remaining FRED requests. Set FRED_API_KEY to use the official API, or rerun with --no-fred-fail-fast if you intentionally want every series retried.
+2026-08-10 10:40:22,256 | INFO | Live baseline complete. Review /Users/nuggylover1210/Projects/TL_Model/outputs/public_baseline
+2026-08-10 10:42:32,735 | INFO | FRED source: no-key graph CSV fallback
+2026-08-10 10:42:47,925 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:43:04,072 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:43:04,073 | WARNING | Skipping FRED jpy_per_usd: graph: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:43:04,073 | WARNING | FRED circuit breaker opened after first failed series; skipping 18 remaining FRED requests. Set FRED_API_KEY to use the official API, or rerun with --no-fred-fail-fast if you intentionally want every series retried.
+2026-08-10 10:43:18,024 | INFO | Live baseline complete. Review /Users/nuggylover1210/Projects/TL_Model/outputs/public_baseline
+2026-08-10 10:48:10,600 | INFO | FRED source: official API
+2026-08-10 10:48:11,450 | INFO | Loaded FRED jpy_per_usd (DEXJPUS)
+2026-08-10 10:48:11,880 | INFO | Loaded FRED usd_per_eur (DEXUSEU)
+2026-08-10 10:48:12,189 | WARNING | Fetch failed (https://api.stlouisfed.org/fred/series/observations, attempt 1/2): 400 Client Error: Bad Request for url: https://api.stlouisfed.org/fred/series/observations?series_id=GOLDAMGBD228NLBM&api_key=10888e4b9dd830b8b5c214a74f563bb1&file_type=json&observation_start=2006-01-01&observation_end=2026-08-10&sort_order=asc&limit=100000
+2026-08-10 10:48:13,601 | WARNING | Fetch failed (https://api.stlouisfed.org/fred/series/observations, attempt 2/2): 400 Client Error: Bad Request for url: https://api.stlouisfed.org/fred/series/observations?series_id=GOLDAMGBD228NLBM&api_key=10888e4b9dd830b8b5c214a74f563bb1&file_type=json&observation_start=2006-01-01&observation_end=2026-08-10&sort_order=asc&limit=100000
+2026-08-10 10:48:28,735 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 1/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:48:44,835 | WARNING | Fetch failed (https://fred.stlouisfed.org/graph/fredgraph.csv, attempt 2/2): HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:48:44,836 | WARNING | Skipping FRED gold_usd: API: Unable to fetch https://api.stlouisfed.org/fred/series/observations: 400 Client Error: Bad Request for url: https://api.stlouisfed.org/fred/series/observations?series_id=GOLDAMGBD228NLBM&api_key=10888e4b9dd830b8b5c214a74f563bb1&file_type=json&observation_start=2006-01-01&observation_end=2026-08-10&sort_order=asc&limit=100000; graph: Unable to fetch https://fred.stlouisfed.org/graph/fredgraph.csv: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=15)
+2026-08-10 10:48:44,837 | WARNING | FRED circuit breaker opened after first failed series; skipping 16 remaining FRED requests. Set FRED_API_KEY to use the official API, or rerun with --no-fred-fail-fast if you intentionally want every series retried.
+2026-08-10 10:48:59,009 | INFO | Live baseline complete. Review /Users/nuggylover1210/Projects/TL_Model/outputs/public_baseline
+2026-08-10 11:32:49,858 | INFO | FRED source: official API
+2026-08-10 11:32:50,770 | INFO | Loaded FRED jpy_per_usd (DEXJPUS)
+2026-08-10 11:32:51,259 | INFO | Loaded FRED usd_per_eur (DEXUSEU)
+2026-08-10 11:32:51,709 | INFO | Loaded FRED gold_usd (NASDAQQGLDI)
+2026-08-10 11:32:52,195 | INFO | Loaded FRED broad_usd (DTWEXBGS)
+2026-08-10 11:32:52,618 | INFO | Loaded FRED us10 (DGS10)
+2026-08-10 11:32:53,113 | INFO | Loaded FRED us10_real (DFII10)
+2026-08-10 11:32:53,624 | INFO | Loaded FRED us10_breakeven (T10YIE)
+2026-08-10 11:32:54,094 | INFO | Loaded FRED sofr (SOFR)
+2026-08-10 11:32:54,577 | INFO | Loaded FRED iorb (IORB)
+2026-08-10 11:32:54,985 | INFO | Loaded FRED fed_assets (WALCL)
+2026-08-10 11:32:55,426 | INFO | Loaded FRED m2 (M2SL)
+2026-08-10 11:32:55,881 | INFO | Loaded FRED fed_swap_lines (SWPT)
+2026-08-10 11:32:56,603 | INFO | Loaded FRED vix (VIXCLS)
+2026-08-10 11:32:56,979 | INFO | Loaded FRED hy_oas (BAMLH0A0HYM2)
+2026-08-10 11:32:57,309 | INFO | Loaded FRED jp10 (IRLTLT01JPM156N)
+2026-08-10 11:32:57,694 | INFO | Loaded FRED de10 (IRLTLT01DEM156N)
+2026-08-10 11:32:58,182 | INFO | Loaded FRED it10 (IRLTLT01ITM156N)
+2026-08-10 11:32:58,567 | INFO | Loaded FRED uk10 (IRLTLT01GBM156N)
+2026-08-10 11:32:58,982 | INFO | Loaded FRED ecb_deposit_rate (ECBDFR)
+2026-08-10 11:33:11,349 | INFO | Live baseline complete. Review /Users/nuggylover1210/Projects/TL_Model/outputs/public_baseline

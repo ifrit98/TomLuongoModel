@@ -1,0 +1,8 @@
+test,status,evidence_from_current_run,next_data_or_decision
+Raw German-Japanese 10Y spread is thin,NOT RUN,Required yield series unavailable.,Restore FRED/OECD series or provide vendor data.
+All-in covered carry approaches zero,CRITICAL DATA GAP,No basis/asset-return/funding-cost series supplied.,Populate optional market-data CSV with executable inputs.
+Leveraged funds reduce short-yen exposure after shocks,PROXY AVAILABLE,Latest net share of OI: -0.145; event inference requires history.,Run live CFTC history and event study; CFTC is not the full OTC book.
+Europe bears more stress than U.S./Japan,NOT RUN,No European fragmentation proxy.,Provide sovereign and bank stress series.
+Japanese capital repatriates,FLOW PROXY AVAILABLE,"Latest resident foreign-security net flow: 6,262 x ¥100m.",Decompose by country/currency and test around BOJ surprises.
+Gold trades as system-repair collateral,NOT RUN,Gold/USD/credit-spread joint panel incomplete.,Restore FRED series or provide vendor data.
+The transition is deliberately engineered,NOT IDENTIFIED BY PRICE DATA,Market sequencing cannot establish intent.,"Require documents, disclosed operations, or institution-specific transaction evidence."
