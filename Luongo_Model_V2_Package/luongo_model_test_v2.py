@@ -1072,6 +1072,66 @@ def hac_regression(
     return model.summary().as_text()
 
 
+def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> pd.DataFrame:
+    """Jordà-style local projections of BTP-Bund on yen appreciation vs EUR.
+
+    Negative horizons act as a pre-trend check: if the spread response is already
+    significant before the shock (h < 0), the causal read that yen strength widens
+    Italian fragmentation risk, rather than merely co-moving with it, does not hold.
+    """
+    required = {"btp_bund_bp", "jpy_appreciation_vs_eur", "vix"}
+    if sm is None or not required.issubset(monthly.columns):
+        return pd.DataFrame()
+
+    work = monthly.copy()
+    work["d_vix"] = work["vix"].diff()
+
+    rows: list[dict[str, object]] = []
+    for h in range(-max_horizon, max_horizon + 1):
+        dep = work["btp_bund_bp"].shift(-h) - work["btp_bund_bp"].shift(1)
+        frame = pd.DataFrame(
+            {
+                "dep": dep,
+                "jpy_appreciation_vs_eur": work["jpy_appreciation_vs_eur"],
+                "d_vix": work["d_vix"],
+            }
+        ).dropna()
+        if len(frame) < 30:
+            LOGGER.info(
+                "Skipping local projection horizon %d: only %d usable observations.",
+                h, len(frame),
+            )
+            continue
+
+        y = frame["dep"]
+        x = sm.add_constant(frame[["jpy_appreciation_vs_eur", "d_vix"]])
+        maxlags = max(3, abs(h) + 1)
+        model = sm.OLS(y, x).fit(cov_type="HAC", cov_kwds={"maxlags": maxlags})
+
+        coef = float(model.params["jpy_appreciation_vs_eur"])
+        std_err = float(model.bse["jpy_appreciation_vs_eur"])
+        z = float(model.tvalues["jpy_appreciation_vs_eur"])
+        pvalue = float(model.pvalues["jpy_appreciation_vs_eur"])
+        ci_low, ci_high = model.conf_int().loc["jpy_appreciation_vs_eur"]
+
+        rows.append(
+            {
+                "horizon": h,
+                "coef": coef,
+                "std_err": std_err,
+                "z": z,
+                "pvalue": pvalue,
+                "ci_low": float(ci_low),
+                "ci_high": float(ci_high),
+                "nobs": int(len(frame)),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values("horizon").reset_index(drop=True)
+
+
 def run_regressions(monthly: pd.DataFrame, output_dir: Path) -> None:
     reports: dict[str, str] = {}
     work = monthly.copy()
@@ -1362,6 +1422,23 @@ def plot_outputs(
             ax.set_ylabel("Gold log return")
             save_plot(fig, chart_dir / "09_gold_dollar_quadrants.png")
 
+    local_projection = local_projection_btp_on_jpy(monthly)
+    if not local_projection.empty:
+        fig, ax = plt.subplots(figsize=(10, 5.5))
+        ax.plot(local_projection["horizon"], local_projection["coef"], marker="o")
+        ax.fill_between(
+            local_projection["horizon"],
+            local_projection["ci_low"],
+            local_projection["ci_high"],
+            alpha=0.2,
+        )
+        ax.axhline(0, linewidth=1)
+        ax.axvline(0, linewidth=1, linestyle="--")
+        ax.set_title("Local projection: BTP-Bund response to yen appreciation vs EUR")
+        ax.set_ylabel("BTP-Bund response (bp)")
+        ax.set_xlabel("Months from yen appreciation")
+        save_plot(fig, chart_dir / "10_local_projection_btp_on_jpy.png")
+
 
 def write_metadata(
     output_dir: Path,
@@ -1526,6 +1603,14 @@ def live_run(args: argparse.Namespace, package_dir: Path, output_dir: Path) -> N
     scorecard = create_scorecard(daily, monthly, cftc, mof)
     scorecard.to_csv(output_dir / "falsification_scorecard.csv", index=False)
     run_regressions(monthly, output_dir)
+
+    local_projection = local_projection_btp_on_jpy(monthly)
+    local_projection.to_csv(output_dir / "local_projection_btp_on_jpy.csv", index=False)
+    LOGGER.info(
+        "Wrote local projection of BTP-Bund on yen appreciation (%d rows) to %s",
+        len(local_projection), output_dir / "local_projection_btp_on_jpy.csv",
+    )
+
     plot_outputs(daily, monthly, cftc, mof, tic, output_dir)
     write_metadata(output_dir, args, source_status)
 
