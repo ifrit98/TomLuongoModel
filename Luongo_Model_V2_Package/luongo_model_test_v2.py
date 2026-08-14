@@ -1095,6 +1095,12 @@ def run_regressions(monthly: pd.DataFrame, output_dir: Path) -> None:
         "d_btp_bund_bp",
         ["d_fr_bund_bp", "d_uk_bund_bp", "jpy_appreciation_vs_eur", "gbp_appreciation_vs_eur", "d_vix"],
     )
+    # Same as above but excluding France to isolate the yen coefficient.
+    reports["ecb_fragmentation_signal_ex_france"] = hac_regression(
+        work,
+        "d_btp_bund_bp",
+        ["d_uk_bund_bp", "jpy_appreciation_vs_eur", "gbp_appreciation_vs_eur", "d_vix"],
+    )
     # US/UK/JP long-end triangle: diagnostic only; shared-yield algebra creates mechanical linkage.
     reports["uk_vs_us_relative_long_end"] = hac_regression(
         work,
