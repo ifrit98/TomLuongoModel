@@ -865,16 +865,35 @@ def run_event_study(
     return pd.DataFrame(rows)
 
 
+def _below_threshold_indicator(series: pd.Series, threshold: float) -> pd.Series:
+    """Below-threshold indicator that preserves NaN on unobserved dates.
+
+    Same idiom as build_daily_panel's eurjpy_below_180 / eurgbp_below_085: a bare
+    `<` comparison evaluates NaN to False, which would silently code every
+    weekend/holiday as "not below threshold" and mis-state regime counts.
+    """
+    return (series < threshold).astype(float).where(series.notna())
+
+
+def _threshold_transitions(series: pd.Series, threshold: float) -> pd.Series:
+    """Below-state transitions on observed dates only: +1 = crossed below, -1 = crossed above.
+
+    Operates on series.dropna() so unobserved (weekend/holiday) dates neither count as
+    a state nor register a spurious crossing when the series resumes.
+    """
+    s = series.dropna().sort_index()
+    below = s < threshold
+    return below.astype(int).diff().dropna()
+
+
 def extract_threshold_crossings(daily: pd.DataFrame) -> pd.DataFrame:
     specs = [("jpy_per_eur", 180.0, "EURJPY_180"), ("gbp_per_eur", 0.85, "EURGBP_085")]
     rows: list[dict[str, object]] = []
     for col, threshold, label in specs:
         if col not in daily:
             continue
-        s = daily[col].dropna().sort_index()
-        below = s < threshold
-        change = below.astype(int).diff()
-        for dt, value in change.dropna().items():
+        change = _threshold_transitions(daily[col], threshold)
+        for dt, value in change.items():
             if value == 1:
                 rows.append({"event_date": dt, "event_type": "threshold_crossing", "source_note": f"{label}: crossed below", "threshold": label, "direction": "below"})
             elif value == -1:
@@ -944,6 +963,93 @@ def threshold_regime_summary(daily: pd.DataFrame, monthly: pd.DataFrame) -> pd.D
                     row[f"median_{c}"] = np.nan
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def placebo_threshold_tests(daily: pd.DataFrame, monthly: pd.DataFrame) -> pd.DataFrame:
+    """Do 180 (EUR/JPY) and 0.85 (EUR/GBP) behave any differently from neighbouring
+    levels, or would any nearby threshold produce the same picture?
+
+    Tests each pre-specified threshold against four placebo levels on either side,
+    using the same NaN-preserving below/above indicator and crossing-transition
+    logic as extract_threshold_crossings / threshold_regime_summary.
+    """
+    specs = [
+        ("jpy_per_eur", [170.0, 175.0, 180.0, 185.0, 190.0], 180.0),
+        ("gbp_per_eur", [0.83, 0.84, 0.85, 0.86, 0.87], 0.85),
+    ]
+    spread_cols = ["btp_bund_bp", "fr_bund_bp"]
+
+    rows: list[dict[str, object]] = []
+    for col, thresholds, prespecified in specs:
+        if col not in daily:
+            continue
+        series = daily[col]
+        vix = daily["vix"] if "vix" in daily else pd.Series(dtype=float, index=daily.index)
+        for threshold in thresholds:
+            below_ind = _below_threshold_indicator(series, threshold)
+            # Restrict to days where the FX rate is actually observed; unobserved
+            # (weekend/holiday) days must be excluded, not silently coded as "above".
+            observed = below_ind.dropna()
+            below_mask = observed == 1.0
+            above_mask = observed == 0.0
+
+            transitions = _threshold_transitions(series, threshold)
+            below_dates = observed.index[below_mask]
+
+            row: dict[str, object] = {
+                "pair": col,
+                "threshold": threshold,
+                "is_prespecified": bool(threshold == prespecified),
+                "days_below": int(below_mask.sum()),
+                "days_above": int(above_mask.sum()),
+                "crossings_below": int((transitions == 1).sum()),
+                "crossings_above": int((transitions == -1).sum()),
+                "first_date_below": below_dates.min().date().isoformat() if len(below_dates) else None,
+                "last_date_below": below_dates.max().date().isoformat() if len(below_dates) else None,
+            }
+
+            vix_below = vix.reindex(observed.index[below_mask])
+            vix_above = vix.reindex(observed.index[above_mask])
+            row["median_vix_below"] = (
+                float(vix_below.median(skipna=True)) if vix_below.notna().any() else np.nan
+            )
+            row["median_vix_above"] = (
+                float(vix_above.median(skipna=True)) if vix_above.notna().any() else np.nan
+            )
+
+            # The spread columns are monthly-only, so label each month by its modal
+            # daily state at this threshold, exactly as threshold_regime_summary does,
+            # then take medians over the labelled months.
+            monthly_state = pd.Series(dtype=object)
+            if not monthly.empty:
+                state = below_ind.map({1.0: "below", 0.0: "above"})
+                monthly_state = state.resample("ME").agg(
+                    lambda s: s.mode().iloc[0] if not s.dropna().empty and not s.mode().empty else np.nan
+                )
+            below_months = monthly_state.index[monthly_state == "below"] if not monthly_state.empty else pd.DatetimeIndex([])
+            above_months = monthly_state.index[monthly_state == "above"] if not monthly_state.empty else pd.DatetimeIndex([])
+
+            for spread_col in spread_cols:
+                if spread_col in monthly.columns:
+                    below_vals = monthly.reindex(below_months)[spread_col]
+                    above_vals = monthly.reindex(above_months)[spread_col]
+                    med_below = float(below_vals.median(skipna=True)) if below_vals.notna().any() else np.nan
+                    med_above = float(above_vals.median(skipna=True)) if above_vals.notna().any() else np.nan
+                else:
+                    med_below = np.nan
+                    med_above = np.nan
+                row[f"median_{spread_col}_below"] = med_below
+                row[f"median_{spread_col}_above"] = med_above
+                row[f"{spread_col}_gap"] = (
+                    med_below - med_above if pd.notna(med_below) and pd.notna(med_above) else np.nan
+                )
+
+            rows.append(row)
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(["pair", "threshold"]).reset_index(drop=True)
+
 
 def hac_regression(
     frame: pd.DataFrame,
@@ -1406,6 +1512,10 @@ def live_run(args: argparse.Namespace, package_dir: Path, output_dir: Path) -> N
         crossing_study = pd.DataFrame()
     crossing_study.to_csv(output_dir / "threshold_crossing_event_study.csv", index=False)
     threshold_regime_summary(daily, monthly).to_csv(output_dir / "threshold_regime_summary.csv", index=False)
+
+    placebo = placebo_threshold_tests(daily, monthly)
+    placebo.to_csv(output_dir / "placebo_threshold_tests.csv", index=False)
+    LOGGER.info("Wrote placebo threshold tests (%d rows) to %s", len(placebo), output_dir / "placebo_threshold_tests.csv")
 
     scorecard = create_scorecard(daily, monthly, cftc, mof)
     scorecard.to_csv(output_dir / "falsification_scorecard.csv", index=False)
