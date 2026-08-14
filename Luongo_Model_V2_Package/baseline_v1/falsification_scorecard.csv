@@ -1,0 +1,8 @@
+test,status,evidence_from_current_run,next_data_or_decision
+Raw German-Japanese 10Y spread is thin,DESCRIPTIVE ONLY,Latest monthly proxy: 30.0 bp.,Do not call this executable carry; add forward/basis/repo inputs.
+All-in covered carry approaches zero,CRITICAL DATA GAP,No basis/asset-return/funding-cost series supplied.,Populate optional market-data CSV with executable inputs.
+Leveraged funds reduce short-yen exposure after shocks,PROXY AVAILABLE,Latest net share of OI: 0.028; event inference requires history.,Run live CFTC history and event study; CFTC is not the full OTC book.
+Europe bears more stress than U.S./Japan,PARTIAL PROXY,Latest BTP-Bund proxy: 76.4 bp.,"Add bank CDS, funding spreads, and comparable U.S./Japan stress indices."
+Japanese capital repatriates,FLOW PROXY AVAILABLE,"Latest resident foreign-security net flow: 6,262 x ¥100m.",Decompose by country/currency and test around BOJ surprises.
+Gold trades as system-repair collateral,JOINT-SIGN PROXY,Repair-sign days: 9.8% of complete daily sample.,Use identified intervention windows; unconditional frequency is not causal proof.
+The transition is deliberately engineered,NOT IDENTIFIED BY PRICE DATA,Market sequencing cannot establish intent.,"Require documents, disclosed operations, or institution-specific transaction evidence."

@@ -1,0 +1,14 @@
+# Secrets — never commit. Holds FRED_API_KEY.
+.env
+
+# Environments
+.venv/
+
+# Generated model outputs (regenerate with luongo_model_test_v2.py)
+outputs/
+outputs_example/
+**/outputs/
+**/raw_cache/
+
+# OS noise
+.DS_Store

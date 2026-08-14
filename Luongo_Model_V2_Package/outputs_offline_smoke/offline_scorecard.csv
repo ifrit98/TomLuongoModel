@@ -1,0 +1,9 @@
+test,status,evidence_from_current_run,next_data_or_decision
+Raw German-Japanese 10Y spread is thin,NOT RUN,Required yield series unavailable.,Restore FRED/OECD series.
+All-in covered carry approaches zero,CRITICAL DATA GAP,No executable basis/asset-return/funding-cost series supplied.,Populate optional market-data CSV.
+France is the continental weak link,NOT RUN,No OAT-Bund proxy.,Fetch France 10Y and premium French stress data.
+BTP-Bund signals ECB fragmentation/intervention pressure,NOT RUN,No BTP-Bund proxy.,Restore Italy/Germany yields.
+CHF/SNB substitutes for lost JPY carry capacity,NOT RUN,Short-rate pair incomplete.,Fetch JP/CH 3m rates and CHF basis.
+Leveraged funds reduce short-yen exposure after shocks,PROXY AVAILABLE,Latest net share of OI: -0.145; history required for event inference.,Use full CFTC history; OTC book remains missing.
+Japanese capital repatriates,FLOW PROXY AVAILABLE,"Latest resident foreign-security net flow: 6,262 x ¥100m.",Make sign convention explicit and decompose by security/country/currency.
+The transition is deliberately engineered,NOT IDENTIFIED BY PRICE DATA,Market sequencing cannot establish intent.,"Require documents, disclosed operations, or institution-specific transaction evidence."

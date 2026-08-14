@@ -1,0 +1,720 @@
+<title>Luongo Carry-Regime Model V2 — Run Verification & Handoff</title>
+<style>
+  :root {
+    --ground: #FCFCFB;
+    --panel: #F4F4F1;
+    --rule: #DEDED8;
+    --ink: #171C21;
+    --ink-2: #3D4750;
+    --muted: #6B7580;
+    --accent: #0A66B0;
+    --s1: #0A66B0;
+    --s2: #D07C15;
+    --s3: #8A4BA8;
+    --s4: #0E8F70;
+    --good: #0E7A4E;
+    --warn: #B06908;
+    --crit: #B02D22;
+    --grid: #E6E6E0;
+    --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #1A1A19; --panel: #232322; --rule: #35352F; --ink: #ECEBE6;
+      --ink-2: #C3C2BB; --muted: #8E8D85; --accent: #3A8ACB;
+      --s1: #3A8ACB; --s2: #C47C18; --s3: #9C63BE; --s4: #1F9E80;
+      --good: #3DAF7A; --warn: #D19A32; --crit: #DB6A5C; --grid: #32322C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #1A1A19; --panel: #232322; --rule: #35352F; --ink: #ECEBE6;
+    --ink-2: #C3C2BB; --muted: #8E8D85; --accent: #3A8ACB;
+    --s1: #3A8ACB; --s2: #C47C18; --s3: #9C63BE; --s4: #1F9E80;
+    --good: #3DAF7A; --warn: #D19A32; --crit: #DB6A5C; --grid: #32322C;
+  }
+  :root[data-theme="light"] {
+    --ground: #FCFCFB; --panel: #F4F4F1; --rule: #DEDED8; --ink: #171C21;
+    --ink-2: #3D4750; --muted: #6B7580; --accent: #0A66B0;
+    --s1: #0A66B0; --s2: #D07C15; --s3: #8A4BA8; --s4: #0E8F70;
+    --good: #0E7A4E; --warn: #B06908; --crit: #B02D22; --grid: #E6E6E0;
+  }
+
+  body {
+    background: var(--ground); color: var(--ink);
+    font-family: var(--font-display); font-size: 1.0625rem; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    display: grid;
+    grid-template-columns:
+      [full-start] minmax(1.25rem, 1fr)
+      [main-start] min(68ch, 100%) [main-end]
+      minmax(1.25rem, 1fr) [full-end];
+    row-gap: 1.5rem;
+    padding: 3rem 0 5rem;
+  }
+  .page > * { grid-column: main; }
+  .page > .wide { grid-column: full; width: min(112ch, 100%); margin-inline: auto; }
+
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; font-weight: 600; }
+  h1 { font-size: clamp(2rem, 1.4rem + 2.4vw, 2.9rem); letter-spacing: -0.02em; margin-bottom: .35rem; }
+  h2 { font-size: 1.55rem; margin-top: 2.25rem; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+  h3 { font-size: 1.16rem; margin-top: 1.4rem; }
+  p { margin-block: .7rem; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  .eyebrow {
+    font-family: var(--font-ui); font-size: .705rem; font-weight: 600;
+    letter-spacing: .13em; text-transform: uppercase; color: var(--muted);
+  }
+  .standfirst { font-size: 1.19rem; color: var(--ink-2); margin-top: .9rem; }
+  .meta {
+    font-family: var(--font-mono); font-size: .78rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: .45rem 1.4rem; margin-top: 1.3rem;
+    padding-top: 1rem; border-top: 1px solid var(--rule);
+  }
+
+  .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 .25rem; }
+  .chip {
+    font-family: var(--font-ui); font-size: .74rem; font-weight: 600; letter-spacing: .02em;
+    padding: .28rem .62rem; border-radius: 3px; border: 1px solid;
+    display: inline-flex; align-items: center; gap: .4rem;
+  }
+  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .chip.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); background: color-mix(in srgb, var(--good) 9%, transparent); }
+  .chip.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 9%, transparent); }
+  .chip.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); background: color-mix(in srgb, var(--crit) 9%, transparent); }
+
+  .callout {
+    background: var(--panel); border-left: 3px solid var(--accent);
+    padding: 1rem 1.15rem; margin: 1.4rem 0; font-size: .99rem;
+  }
+  .callout.alert { border-left-color: var(--crit); }
+  .callout.caution { border-left-color: var(--warn); }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    font-family: var(--font-ui); font-size: .705rem; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+    display: block; margin-bottom: .4rem;
+  }
+
+  pre {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+    padding: .9rem 1rem; overflow-x: auto; font-family: var(--font-mono);
+    font-size: .8rem; line-height: 1.6; color: var(--ink-2);
+  }
+  code { font-family: var(--font-mono); font-size: .855em; color: var(--ink-2); }
+  p code, li code, td code { background: var(--panel); padding: .1em .34em; border-radius: 2px; }
+
+  .table-wrap { overflow-x: auto; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--font-ui); font-size: .845rem; }
+  th, td { text-align: left; padding: .52rem .7rem; border-bottom: 1px solid var(--rule); }
+  th {
+    font-size: .705rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1.5px solid var(--rule); white-space: nowrap;
+  }
+  td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  tbody tr:hover { background: var(--panel); }
+  .dim { color: var(--muted); }
+
+  figure { margin: 1.9rem 0; }
+  figcaption {
+    font-family: var(--font-ui); font-size: .81rem; color: var(--muted);
+    margin-top: .7rem; line-height: 1.55; max-width: 76ch;
+  }
+  figcaption b { color: var(--ink-2); font-weight: 600; }
+  .fig-title { font-family: var(--font-ui); font-size: .95rem; font-weight: 700; color: var(--ink); margin-bottom: .15rem; }
+  .fig-sub { font-family: var(--font-ui); font-size: .8rem; color: var(--muted); margin-bottom: .8rem; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; font-family: var(--font-ui); font-size: .78rem; color: var(--ink-2); margin-bottom: .6rem; }
+  .legend span { display: inline-flex; align-items: center; gap: .4rem; }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; flex: none; }
+
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis text { font-family: var(--font-ui); font-size: 10.5px; fill: var(--muted); }
+  .axis line, .axis path { stroke: var(--grid); }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .serie { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: var(--ground); border: 1px solid var(--rule); border-radius: 3px;
+    padding: .5rem .65rem; font-family: var(--font-ui); font-size: .78rem;
+    box-shadow: 0 4px 16px rgb(0 0 0 / .16); z-index: 50; max-width: 260px;
+    color: var(--ink);
+  }
+  .tooltip .tt-h { font-weight: 700; margin-bottom: .3rem; }
+  .tooltip .tt-r { display: flex; justify-content: space-between; gap: 1rem; }
+  .tooltip .tt-r span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  ul, ol { padding-left: 1.3rem; margin-block: .7rem; }
+  li { margin-block: .32rem; }
+  li::marker { color: var(--muted); }
+
+  .qgrid { display: grid; gap: .85rem; margin: 1.2rem 0; }
+  .qcard { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: .85rem 1rem; }
+  .qcard .q { font-weight: 600; font-size: 1rem; }
+  .qcard .a { font-family: var(--font-ui); font-size: .845rem; color: var(--ink-2); margin-top: .3rem; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Run Verification &amp; Analyst Handoff · 13 August 2026</div>
+    <h1>Luongo Carry-Regime Model V2</h1>
+    <p class="standfirst">The V2 package runs end to end against live FRED data. Five defects were found and fixed during verification — one of which silently mis-stated the headline regime table by a factor of fourteen. This document records what was fixed, what the corrected run actually shows, and what remains genuinely unidentified.</p>
+    <div class="meta">
+      <span>Sample 2006-01-01 → 2026-08-13</span>
+      <span>27 FRED series + CFTC/MOF/TIC</span>
+      <span>5,161 observed trading days</span>
+      <span>245 monthly observations</span>
+    </div>
+    <div class="chips">
+      <span class="chip ok">Offline smoke: pass</span>
+      <span class="chip ok">Live run: pass</span>
+      <span class="chip ok">5 defects fixed</span>
+      <span class="chip crit">Rotate FRED key</span>
+    </div>
+  </header>
+
+  <h2>Where this sits in the project</h2>
+  <p>Tom's response to the V1 report changed the model's variable ontology rather than defending the original formulation. Three of his points define V2's structure:</p>
+  <ul>
+    <li><b>Italy is not the victim.</b> BTP–Bund is a thermometer for <i>when the ECB is intervening</i> in the Bund market, not a measure of who is breaking.</li>
+    <li><b>France is the suspected weak link</b> on the continent, with the UK/London a separate channel.</li>
+    <li><b>The thresholds are the real question.</b> "Why is the ECB so scared of a drop of the EUR/GBP below 0.85 and a EUR/JPY below 180?"</li>
+  </ul>
+  <p>That decomposes the model into three observable roles — <b>carry condition</b> (Germany–Japan geometry, EUR/JPY, CHF funding), <b>weak-link stress</b> (France first, UK separately), and <b>policy response</b> (BTP–Bund spikes) — which is what V2 implements. This run is the first clean test of that structure.</p>
+
+  <div class="callout">
+    <span class="label">Threshold convention — resolved</span>
+    <p>Tom's phrasing settles a question the code had left ambiguous: the feared state is a <b>drop below</b> 180 and 0.85, not a break above. The code already encoded <code>below</code> as the trigger, so no logic changed. The state labels are now explicit (<code>both_below</code>, <code>eurjpy_below_only</code>, <code>both_above</code>) and the convention is written into <code>run_metadata.json</code> so nothing downstream inverts it by accident.</p>
+  </div>
+
+  <h2>Reproducing this run</h2>
+  <p>Both paths are verified working from a cold start. The offline path needs no network and no key:</p>
+  <pre>cd Luongo_Model_V2_Package
+python luongo_model_test_v2.py --offline-snapshots --output outputs/smoke
+# → cftc_rows: 1, mof_rows: 1109, tic_rows: 7007, tic_latest_date: 2026-05-01</pre>
+  <p>The live run pulls 27 FRED series plus CFTC, MOF and TIC, and takes roughly four minutes:</p>
+  <pre>export FRED_API_KEY='YOUR_KEY'
+python luongo_model_test_v2.py \
+  --start 2006-01-01 \
+  --events events_v2_template.csv \
+  --output outputs/v2_public</pre>
+  <p class="dim" style="font-size:.92rem">Transient FRED read timeouts occur and are retried automatically; one occurred in this run and recovered. All 27 series loaded. Outputs: daily and monthly panels, event study, threshold crossings and crossing event study, regime summary, falsification scorecard, regression report, run metadata, and nine charts.</p>
+
+  <h2>Defects found and fixed</h2>
+  <p>All five were found by checking outputs against expectations, not by the script failing — it exited cleanly both before and after. That is the important lesson for the next session: <b>this harness does not fail loudly when it is wrong.</b></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Defect</th><th>Location</th><th>Consequence if unfixed</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>FRED API key written to run metadata in plaintext</td><td><code>write_metadata</code></td><td>Credential shipped to collaborators in the outputs folder</td></tr>
+        <tr><td class="num">2</td><td>NaN coerced to <code>False</code> in threshold indicators</td><td><code>build_daily_panel</code>, l.676/684</td><td>Every weekend and holiday filed as "above threshold"</td></tr>
+        <tr><td class="num">3</td><td>Event-study windows clamped at sample end</td><td><code>_observed_window_change</code></td><td>A 5-day move silently reported under the 20-day label</td></tr>
+        <tr><td class="num">4</td><td><code>monthly</code> frame accepted but never used</td><td><code>threshold_regime_summary</code></td><td>France and Italy never conditioned on the thresholds at all</td></tr>
+        <tr><td class="num">5</td><td>No era information on regime states</td><td><code>threshold_regime_summary</code></td><td>Confounded comparison reads as a threshold effect</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The one that mattered</h3>
+  <p>Defect 2 took two passes to fix, and the first attempt is instructive. The visible symptom was <code>.fillna(0)</code> in the regime summary. Patching that changed nothing — the counts still summed to 7,530, exactly the number of calendar days in the sample. The actual cause was upstream:</p>
+  <pre>panel["eurjpy_below_180"] = (panel["jpy_per_eur"] &lt; 180.0).astype(float)</pre>
+  <p>A bare <code>&lt;</code> comparison evaluates <code>NaN</code> to <code>False</code>, and <code>.astype(float)</code> freezes that as a hard <code>0.0</code>. The missingness was destroyed at construction, so no amount of downstream <code>fillna</code> handling could recover it. The fix preserves it with <code>.where(panel["jpy_per_eur"].notna())</code>.</p>
+
+  <figure class="wide">
+    <div class="fig-title">Figure 1 · Regime day-counts before and after the NaN fix</div>
+    <div class="fig-sub">Daily observations assigned to each threshold state</div>
+    <div id="fig-buckets"></div>
+    <figcaption>The <b>both_above</b> bucket fell from 2,548 days to 179 — roughly 2,369 weekend and holiday rows had been classified as "above threshold" purely because no FX price printed. The corrected total, 5,161, is the real count of days on which both rates were observed. The other three states were unaffected, which is why the error was invisible in aggregate: only the bucket that depended on <i>both</i> indicators reading zero absorbed the contamination.</figcaption>
+  </figure>
+
+  <h2>What the corrected run shows</h2>
+
+  <h3>The threshold states are historical episodes, not samples</h3>
+  <p>This is the single most important caveat in the current results, and it is easy to miss from the summary table alone.</p>
+
+  <figure class="wide">
+    <div class="fig-title">Figure 2 · Threshold regime through time</div>
+    <div class="fig-sub">Daily state, EUR/JPY against 180, EUR/GBP against 0.85 — month-end levels</div>
+    <div id="fig-regime"></div>
+    <figcaption>The <b>both_above</b> state — both rates comfortably above the levels the ECB is said to defend — is confined entirely to <b>17 Nov 2025 through 7 Aug 2026</b>. It is one recent nine-month episode. The <b>both_below</b> state spans eighteen years and contains the entire euro-area sovereign crisis. Any cross-state comparison is therefore "the last nine months versus the previous two decades," and differences in French or Italian spreads across states are confounded with era rather than caused by the threshold.</figcaption>
+  </figure>
+
+  <div class="table-wrap wide">
+    <table>
+      <thead>
+        <tr>
+          <th>State</th><th class="num">Days</th><th>Span</th><th class="num">Months</th>
+          <th class="num">OAT–Bund</th><th class="num">BTP–Bund</th><th class="num">UK–Bund</th>
+          <th class="num">DE–JP 10y</th><th class="num">CHF adv.</th><th class="num">VIX</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><b>both_below</b> <span class="dim">feared</span></td><td class="num">2,394</td><td class="dim">2006-01 → 2025-06</td><td class="num">117</td><td class="num">40.7</td><td class="num">137.2</td><td class="num">91.6</td><td class="num">95.7</td><td class="num">23.7</td><td class="num">16.35</td></tr>
+        <tr><td><b>eurjpy_below_only</b></td><td class="num">2,586</td><td class="dim">2008-11 → 2025-11</td><td class="num">122</td><td class="num">43.8</td><td class="num">165.7</td><td class="num">104.5</td><td class="num">83.2</td><td class="num">62.7</td><td class="num">17.89</td></tr>
+        <tr><td><b>eurgbp_below_only</b></td><td class="num">2</td><td class="dim">2026-07 (2 days)</td><td class="num">0</td><td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td><td class="num">16.20</td></tr>
+        <tr><td><b>both_above</b> <span class="dim">calm</span></td><td class="num">179</td><td class="dim">2025-11 → 2026-08</td><td class="num">9</td><td class="num">72.3</td><td class="num">76.4</td><td class="num">179.1</td><td class="num">56.5</td><td class="num">127.7</td><td class="num">17.67</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="dim" style="font-size:.92rem">Spreads in basis points, medians of month-end values. "CHF adv." is the 3-month CHF funding advantage over JPY. <code>eurgbp_below_only</code> holds two days in July 2026; its statistics are artifacts and should be ignored.</p>
+
+  <div class="callout caution">
+    <span class="label">Read this before quoting the table</span>
+    <p>The table appears to say something dramatic: in the feared <b>both_below</b> state, BTP–Bund is nearly double its calm-state level (137bp against 76bp) while French OAT–Bund is <i>narrower</i> (41bp against 72bp). Do not report that as a threshold effect. The wide Italian spread in the below state is substantially just 2011–2012, and the calm state is only the last nine months. The comparison cannot separate the threshold from the decade.</p>
+  </div>
+
+  <figure class="wide">
+    <div class="fig-title">Figure 3 · European stress and intervention spreads</div>
+    <div class="fig-sub">Month-end sovereign spreads over Bunds, basis points</div>
+    <div id="fig-spreads"></div>
+    <figcaption>The shaded band marks the <b>both_above</b> episode. The Italian spread's history is dominated by 2011–2012 and 2018, both far outside that window — which is the era confounding made visible. Note also that France and Italy track each other closely throughout; that co-movement turns out to be the strongest relationship in the whole regression set.</figcaption>
+  </figure>
+
+  <h3>The result that does support Tom's chain</h3>
+  <p>The regressions are monthly, HAC-robust with 3 lags, 245 observations. One coefficient stands out, and it was not in the V1 report:</p>
+
+  <div class="table-wrap wide">
+    <table>
+      <thead><tr><th>Model</th><th>Dependent</th><th class="num">R²</th><th>JPY appreciation vs EUR</th><th>GBP appreciation vs EUR</th></tr></thead>
+      <tbody>
+        <tr><td>ECB fragmentation</td><td><code>d_btp_bund_bp</code></td><td class="num">0.465</td><td><b>+162.99</b> <span class="dim">z=4.11, p&lt;0.001</span></td><td>+5.39 <span class="dim">p=0.92</span></td></tr>
+        <tr><td>UK vs US long end</td><td><code>d_us_uk_10y_bp</code></td><td class="num">0.072</td><td><b>−153.10</b> <span class="dim">z=−3.22, p=0.001</span></td><td>+159.46 <span class="dim">p=0.053</span></td></tr>
+        <tr><td>CHF substitute carry</td><td><code>d_chf_funding_adv</code></td><td class="num">0.046</td><td>+79.65 <span class="dim">p=0.18</span></td><td>−70.39 <span class="dim">p=0.37</span></td></tr>
+        <tr><td>France weak link</td><td><code>d_fr_bund_bp</code></td><td class="num">0.035</td><td>+18.77 <span class="dim">p=0.26</span></td><td>+7.16 <span class="dim">p=0.72</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>Yen appreciation against the euro significantly widens BTP–Bund</b> (p&lt;0.001), while sterling appreciation does essentially nothing (p=0.92). That asymmetry is the useful part: it is consistent with a specifically <i>JPY-carry</i> channel into ECB fragmentation pressure rather than a generic risk-off channel, which would move both. It is the first quantitative support in this project for the carry → intervention link.</p>
+  <p>Two honest qualifications. The relationship is contemporaneous at monthly frequency, so it establishes co-movement, not direction — BTP–Bund widening and yen strength could both be responses to a third thing. And <code>d_fr_bund_bp</code> enters the same equation at +1.83 with z=8.54, meaning France and Italy move nearly one-for-one; the ECB equation's high R² is substantially France explaining Italy.</p>
+
+  <figure class="wide">
+    <div class="fig-title">Figure 4 · Explanatory power by model</div>
+    <div class="fig-sub">R², monthly HAC regressions, n=245</div>
+    <div id="fig-r2"></div>
+    <figcaption>The France equation is the weakest in the set. On monthly public proxies, OAT–Bund does not respond to the carry variables the way the France-as-weak-link hypothesis predicts.</figcaption>
+  </figure>
+
+  <h3>The France hypothesis is not yet supported — and that is not a refutation</h3>
+  <p>The France regression returns <b>R² = 0.035 with no coefficient significant at conventional levels</b>. The closest is the Germany–Japan spread at p=0.11, and its sign is negative.</p>
+  <p>This does not refute Tom's instinct. The hypothesis is about funding-market microstructure — repo specialness, collateral quality, bank wholesale funding, auction mechanics — and the test is being run on monthly OECD-frequency benchmark yields, which cannot see any of that. A null here is close to what a correct model of an invisible mechanism would produce. It does mean the public-data version of this question has been asked and answered, and further progress requires the practitioner layer.</p>
+
+  <h2>Where the model is genuinely blocked</h2>
+  <p>These are the questions where no amount of additional public data helps, framed for Matt Dines and Vince Lanci.</p>
+
+  <div class="qgrid">
+    <div class="qcard">
+      <div class="q">What is the actual trade?</div>
+      <div class="a">Outright FX, cross-currency basis, swap spread, repo-funded sovereign basis, or a combination? Which tenor carries the risk? This determines every variable specification downstream and is the single highest-value input.</div>
+    </div>
+    <div class="qcard">
+      <div class="q">Who holds the vulnerable book?</div>
+      <div class="a">The model can locate stress in prices but cannot see balance sheets. French bank wholesale funding, LDI-style leverage in the UK, and the identity of the levered holder are all invisible in public series.</div>
+    </div>
+    <div class="qcard">
+      <div class="q">Are 180 and 0.85 actually defended?</div>
+      <div class="a">What would count as evidence — options positioning clustered at the strike, dealer hedging flow, official commentary timed to approaches? Right now these are levels Tom observes the ECB reacting to, and the public data cannot distinguish a defended boundary from a coincidence.</div>
+    </div>
+    <div class="qcard">
+      <div class="q">Is CHF really absorbing carry capacity?</div>
+      <div class="a">The public rate geometry is suggestive — CHF funding is cheaper than JPY by 131bp on the latest common 3-month observation — but the regression finds nothing (p=0.18). Needs CHF forwards, cross-currency basis, and actual SARON funding terms.</div>
+    </div>
+    <div class="qcard">
+      <div class="q">France-specific diagnostics</div>
+      <div class="a">OAT–Bund alone is too coarse. Wanted: French sovereign and bank CDS, OAT repo specialness, auction tails and bid-to-cover, France/Germany collateral differentials, and OAT–Bund volatility rather than level.</div>
+    </div>
+  </div>
+
+  <h2>Picking this up cold</h2>
+  <ol>
+    <li><b>Rotate the FRED key.</b> It was written in plaintext by the pre-fix run and is present in that output's <code>run_metadata.json</code> and in the session logs. The script no longer does this, but the exposed key is still exposed.</li>
+    <li><b>Do not treat the regime table as evidence</b> until the era confound is addressed. The most direct fix is to test the thresholds <i>within</i> period — compare behaviour in windows approaching a crossing against matched non-crossing windows in the same era, rather than pooling twenty years.</li>
+    <li><b>Push on the BTP–Bund result</b>, since it is the one live finding. Add leads and lags to separate co-movement from sequence, and condition on identified ECB operations (PEPP, TPI, reinvestment skews) to test whether the relationship concentrates around intervention episodes.</li>
+    <li><b>Re-specify France at higher frequency</b> once practitioner data arrives. The monthly public test is exhausted.</li>
+    <li><b>Populate the optional market-data template.</b> Every "critical data gap" line in the falsification scorecard resolves to this one file: <code>optional_market_data_v2_template.csv</code>.</li>
+  </ol>
+
+  <div class="callout">
+    <span class="label">Known non-blocking issue</span>
+    <p>pandas 3.0 emits a <code>Pandas4Warning</code> about default concat sort order at line 475. Harmless now; it becomes an error under pandas 4.</p>
+  </div>
+
+  <h2>Falsification scorecard, current state</h2>
+  <div class="table-wrap wide">
+    <table>
+      <thead><tr><th>Claim</th><th>Status</th><th>Current evidence</th></tr></thead>
+      <tbody>
+        <tr><td>Raw German–Japanese 10Y spread is thin</td><td>Descriptive only</td><td class="num">30.0 bp</td></tr>
+        <tr><td>All-in covered carry approaches zero</td><td><b>Critical data gap</b></td><td class="dim">No executable basis / funding series supplied</td></tr>
+        <tr><td>France is the continental weak link</td><td>Partial proxy</td><td class="num">OAT–Bund 71.0 bp</td></tr>
+        <tr><td>BTP–Bund signals ECB intervention pressure</td><td>State proxy</td><td class="num">76.4 bp, 24m change-z 0.01</td></tr>
+        <tr><td>UK/London is a separate weak link</td><td>Partial proxy</td><td class="num">UK–Bund 182.6 bp</td></tr>
+        <tr><td>CHF/SNB substitutes for lost JPY carry</td><td>Short-rate proxy</td><td class="num">CHF cheaper by 131.4 bp</td></tr>
+        <tr><td>EUR/JPY 180 and EUR/GBP 0.85 are boundaries</td><td>Explicit hypothesis</td><td class="num">182.10 / 0.8563</td></tr>
+        <tr><td>Leveraged funds cut short-yen after shocks</td><td>Proxy available</td><td class="num">Net share of OI 0.028</td></tr>
+        <tr><td>Japanese capital repatriates</td><td>Flow proxy available</td><td class="num">6,262 ×¥100m</td></tr>
+        <tr><td>Gold trades as system-repair collateral</td><td>Joint-sign proxy</td><td class="num">Repair-sign days 9.9%</td></tr>
+        <tr><td>The transition is deliberately engineered</td><td><b>Not identifiable</b></td><td class="dim">Price sequencing cannot establish intent</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="dim" style="font-size:.9rem; margin-top:2rem; padding-top:1rem; border-top:1px solid var(--rule);">Generated from <code>outputs/v2_public</code>, run 13 Aug 2026. All figures in this document are drawn from that run's panels and regression report. Sovereign yields are OECD monthly benchmark series via FRED and are diagnostics, not executable carry.</p>
+
+</div>
+
+<div class="tooltip" id="tt" role="status" aria-live="polite"></div>
+
+<script id="chart-data" type="application/json">{"runs": [["2006-01-03", "2008-11-13", "both_below"], ["2008-11-17", "2008-11-28", "both_below"], ["2008-12-01", "2009-06-11", "eurjpy_below_only"], ["2009-06-23", "2009-08-04", "eurjpy_below_only"], ["2009-08-06", "2010-05-25", "eurjpy_below_only"], ["2010-06-01", "2010-07-16", "both_below"], ["2010-07-20", "2010-09-21", "both_below"], ["2010-09-24", "2010-11-10", "eurjpy_below_only"], ["2010-11-16", "2010-11-22", "eurjpy_below_only"], ["2010-11-23", "2010-12-02", "both_below"], ["2010-12-06", "2010-12-14", "both_below"], ["2010-12-16", "2010-12-21", "both_below"], ["2010-12-22", "2011-01-04", "eurjpy_below_only"], ["2011-01-05", "2011-01-21", "both_below"], ["2011-01-24", "2011-02-02", "eurjpy_below_only"], ["2011-02-10", "2011-02-23", "both_below"], ["2011-03-02", "2011-12-09", "eurjpy_below_only"], ["2011-12-12", "2013-01-24", "both_below"], ["2013-01-25", "2013-02-07", "eurjpy_below_only"], ["2013-02-11", "2013-03-22", "eurjpy_below_only"], ["2013-03-25", "2013-04-05", "both_below"], ["2013-04-08", "2013-04-24", "eurjpy_below_only"], ["2013-04-25", "2013-05-20", "both_below"], ["2013-05-21", "2013-06-05", "eurjpy_below_only"], ["2013-06-07", "2013-06-12", "eurjpy_below_only"], ["2013-06-27", "2013-08-30", "eurjpy_below_only"], ["2013-09-03", "2013-10-10", "both_below"], ["2013-10-15", "2013-10-22", "both_below"], ["2013-10-23", "2013-10-30", "eurjpy_below_only"], ["2013-10-31", "2016-07-01", "both_below"], ["2016-07-05", "2016-07-11", "eurjpy_below_only"], ["2016-07-12", "2016-08-08", "both_below"], ["2016-08-09", "2016-08-30", "eurjpy_below_only"], ["2016-08-31", "2016-09-12", "both_below"], ["2016-09-13", "2016-11-18", "eurjpy_below_only"], ["2016-11-29", "2016-12-06", "both_below"], ["2016-12-08", "2016-12-22", "both_below"], ["2016-12-23", "2016-12-30", "eurjpy_below_only"], ["2017-01-04", "2017-01-25", "eurjpy_below_only"], ["2017-01-27", "2017-02-10", "eurjpy_below_only"], ["2017-02-27", "2017-04-11", "eurjpy_below_only"], ["2017-04-12", "2017-04-24", "both_below"], ["2017-04-26", "2017-05-15", "both_below"], ["2017-05-16", "2019-12-03", "eurjpy_below_only"], ["2019-12-04", "2019-12-18", "both_below"], ["2019-12-23", "2019-12-30", "eurjpy_below_only"], ["2020-01-10", "2020-01-21", "eurjpy_below_only"], ["2020-01-22", "2020-01-31", "both_below"], ["2020-02-04", "2020-02-26", "both_below"], ["2020-02-27", "2021-04-02", "eurjpy_below_only"], ["2021-04-06", "2021-08-04", "eurjpy_below_only"], ["2021-08-05", "2021-08-12", "both_below"], ["2021-08-13", "2021-10-06", "eurjpy_below_only"], ["2021-10-07", "2021-11-01", "both_below"], ["2021-11-04", "2021-11-12", "eurjpy_below_only"], ["2021-11-15", "2021-11-29", "both_below"], ["2021-12-08", "2021-12-15", "eurjpy_below_only"], ["2021-12-22", "2022-05-04", "both_below"], ["2022-05-05", "2022-05-13", "eurjpy_below_only"], ["2022-05-16", "2022-05-23", "both_below"], ["2022-05-31", "2022-06-06", "eurjpy_below_only"], ["2022-06-08", "2022-07-06", "eurjpy_below_only"], ["2022-07-07", "2022-07-14", "both_below"], ["2022-07-25", "2022-08-18", "both_below"], ["2022-08-29", "2024-06-06", "eurjpy_below_only"], ["2024-06-07", "2024-08-01", "both_below"], ["2024-08-02", "2024-08-21", "eurjpy_below_only"], ["2024-08-22", "2025-04-03", "both_below"], ["2025-04-04", "2025-04-30", "eurjpy_below_only"], ["2025-05-08", "2025-06-11", "both_below"], ["2025-06-12", "2025-11-14", "eurjpy_below_only"], ["2025-11-19", "2026-07-14", "both_above"], ["2026-07-17", "2026-08-07", "both_above"]], "spreads": [{"d": "2006-01-31", "fr_bund_bp": 1.9, "btp_bund_bp": 22.3, "uk_bund_bp": 75.4, "de_jp_10y_bp": 177.4, "chf_funding_advantage_vs_jpy_bp": -82.1}, {"d": "2006-02-28", "fr_bund_bp": 3.7, "btp_bund_bp": 22.4, "uk_bund_bp": 68.2, "de_jp_10y_bp": 187.4, "chf_funding_advantage_vs_jpy_bp": -88.7}, {"d": "2006-03-31", "fr_bund_bp": 5.3, "btp_bund_bp": 28.6, "uk_bund_bp": 68.0, "de_jp_10y_bp": 187.8, "chf_funding_advantage_vs_jpy_bp": -98.8}, {"d": "2006-04-30", "fr_bund_bp": 5.5, "btp_bund_bp": 32.7, "uk_bund_bp": 62.3, "de_jp_10y_bp": 193.9, "chf_funding_advantage_vs_jpy_bp": -103.6}, {"d": "2006-05-31", "fr_bund_bp": 3.7, "btp_bund_bp": 32.2, "uk_bund_bp": 68.6, "de_jp_10y_bp": 211.4, "chf_funding_advantage_vs_jpy_bp": -103.2}, {"d": "2006-06-30", "fr_bund_bp": 5.0, "btp_bund_bp": 33.5, "uk_bund_bp": 70.4, "de_jp_10y_bp": 205.9, "chf_funding_advantage_vs_jpy_bp": -102.3}, {"d": "2006-07-31", "fr_bund_bp": 2.0, "btp_bund_bp": 29.6, "uk_bund_bp": 64.6, "de_jp_10y_bp": 208.3, "chf_funding_advantage_vs_jpy_bp": -98.8}, {"d": "2006-08-31", "fr_bund_bp": 1.6, "btp_bund_bp": 28.7, "uk_bund_bp": 77.0, "de_jp_10y_bp": 221.6, "chf_funding_advantage_vs_jpy_bp": -109.1}, {"d": "2006-09-30", "fr_bund_bp": 1.6, "btp_bund_bp": 28.2, "uk_bund_bp": 79.8, "de_jp_10y_bp": 212.6, "chf_funding_advantage_vs_jpy_bp": -120.7}, {"d": "2006-10-31", "fr_bund_bp": 2.2, "btp_bund_bp": 28.2, "uk_bund_bp": 82.8, "de_jp_10y_bp": 207.0, "chf_funding_advantage_vs_jpy_bp": -130.0}, {"d": "2006-11-30", "fr_bund_bp": 2.6, "btp_bund_bp": 25.6, "uk_bund_bp": 83.1, "de_jp_10y_bp": 202.4, "chf_funding_advantage_vs_jpy_bp": -130.4}, {"d": "2006-12-31", "fr_bund_bp": 3.9, "btp_bund_bp": 26.7, "uk_bund_bp": 84.9, "de_jp_10y_bp": 212.6, "chf_funding_advantage_vs_jpy_bp": -136.8}, {"d": "2007-01-31", "fr_bund_bp": 5.3, "btp_bund_bp": 24.6, "uk_bund_bp": 85.3, "de_jp_10y_bp": 231.2, "chf_funding_advantage_vs_jpy_bp": -151.0}, {"d": "2007-02-28", "fr_bund_bp": 5.1, "btp_bund_bp": 23.1, "uk_bund_bp": 84.7, "de_jp_10y_bp": 240.9, "chf_funding_advantage_vs_jpy_bp": -145.1}, {"d": "2007-03-31", "fr_bund_bp": 5.9, "btp_bund_bp": 23.5, "uk_bund_bp": 87.8, "de_jp_10y_bp": 231.2, "chf_funding_advantage_vs_jpy_bp": -150.0}, {"d": "2007-04-30", "fr_bund_bp": 5.8, "btp_bund_bp": 21.8, "uk_bund_bp": 89.2, "de_jp_10y_bp": 249.9, "chf_funding_advantage_vs_jpy_bp": -157.4}, {"d": "2007-05-31", "fr_bund_bp": 6.1, "btp_bund_bp": 21.1, "uk_bund_bp": 86.7, "de_jp_10y_bp": 254.6, "chf_funding_advantage_vs_jpy_bp": -164.7}, {"d": "2007-06-30", "fr_bund_bp": 6.0, "btp_bund_bp": 21.2, "uk_bund_bp": 87.2, "de_jp_10y_bp": 265.7, "chf_funding_advantage_vs_jpy_bp": -171.4}, {"d": "2007-07-31", "fr_bund_bp": 7.5, "btp_bund_bp": 25.5, "uk_bund_bp": 90.3, "de_jp_10y_bp": 269.6, "chf_funding_advantage_vs_jpy_bp": -184.2}, {"d": "2007-08-31", "fr_bund_bp": 9.3, "btp_bund_bp": 28.7, "uk_bund_bp": 85.3, "de_jp_10y_bp": 272.0, "chf_funding_advantage_vs_jpy_bp": -176.7}, {"d": "2007-09-30", "fr_bund_bp": 13.4, "btp_bund_bp": 34.8, "uk_bund_bp": 76.7, "de_jp_10y_bp": 252.8, "chf_funding_advantage_vs_jpy_bp": -164.3}, {"d": "2007-10-31", "fr_bund_bp": 11.7, "btp_bund_bp": 30.8, "uk_bund_bp": 67.5, "de_jp_10y_bp": 266.7, "chf_funding_advantage_vs_jpy_bp": -160.7}, {"d": "2007-11-30", "fr_bund_bp": 14.1, "btp_bund_bp": 36.0, "uk_bund_bp": 63.7, "de_jp_10y_bp": 259.2, "chf_funding_advantage_vs_jpy_bp": -142.5}, {"d": "2007-12-31", "fr_bund_bp": 14.4, "btp_bund_bp": 33.2, "uk_bund_bp": 48.8, "de_jp_10y_bp": 268.0, "chf_funding_advantage_vs_jpy_bp": -148.4}, {"d": "2008-01-31", "fr_bund_bp": 12.2, "btp_bund_bp": 37.1, "uk_bund_bp": 46.5, "de_jp_10y_bp": 259.9, "chf_funding_advantage_vs_jpy_bp": -143.8}, {"d": "2008-02-29", "fr_bund_bp": 12.7, "btp_bund_bp": 40.1, "uk_bund_bp": 67.1, "de_jp_10y_bp": 252.4, "chf_funding_advantage_vs_jpy_bp": -156.7}, {"d": "2008-03-31", "fr_bund_bp": 22.1, "btp_bund_bp": 57.8, "uk_bund_bp": 64.6, "de_jp_10y_bp": 255.4, "chf_funding_advantage_vs_jpy_bp": -144.8}, {"d": "2008-04-30", "fr_bund_bp": 23.0, "btp_bund_bp": 49.2, "uk_bund_bp": 60.3, "de_jp_10y_bp": 244.0, "chf_funding_advantage_vs_jpy_bp": -134.1}, {"d": "2008-05-31", "fr_bund_bp": 20.8, "btp_bund_bp": 50.1, "uk_bund_bp": 66.6, "de_jp_10y_bp": 242.4, "chf_funding_advantage_vs_jpy_bp": -120.3}, {"d": "2008-06-30", "fr_bund_bp": 21.0, "btp_bund_bp": 58.6, "uk_bund_bp": 69.0, "de_jp_10y_bp": 291.9, "chf_funding_advantage_vs_jpy_bp": -128.4}, {"d": "2008-07-31", "fr_bund_bp": 20.0, "btp_bund_bp": 60.5, "uk_bund_bp": 55.9, "de_jp_10y_bp": 295.3, "chf_funding_advantage_vs_jpy_bp": -135.7}, {"d": "2008-08-31", "fr_bund_bp": 19.8, "btp_bund_bp": 61.2, "uk_bund_bp": 52.4, "de_jp_10y_bp": 277.1, "chf_funding_advantage_vs_jpy_bp": -133.3}, {"d": "2008-09-30", "fr_bund_bp": 26.6, "btp_bund_bp": 71.0, "uk_bund_bp": 47.6, "de_jp_10y_bp": 261.3, "chf_funding_advantage_vs_jpy_bp": -125.5}, {"d": "2008-10-31", "fr_bund_bp": 29.7, "btp_bund_bp": 89.7, "uk_bund_bp": 69.5, "de_jp_10y_bp": 239.7, "chf_funding_advantage_vs_jpy_bp": -52.1}, {"d": "2008-11-30", "fr_bund_bp": 42.3, "btp_bund_bp": 118.7, "uk_bund_bp": 70.1, "de_jp_10y_bp": 217.9, "chf_funding_advantage_vs_jpy_bp": 18.0}, {"d": "2008-12-31", "fr_bund_bp": 49.2, "btp_bund_bp": 142.1, "uk_bund_bp": 57.6, "de_jp_10y_bp": 183.4, "chf_funding_advantage_vs_jpy_bp": 63.2}, {"d": "2009-01-31", "fr_bund_bp": 52.9, "btp_bund_bp": 155.0, "uk_bund_bp": 59.9, "de_jp_10y_bp": 179.9, "chf_funding_advantage_vs_jpy_bp": 62.6}, {"d": "2009-02-28", "fr_bund_bp": 55.3, "btp_bund_bp": 140.8, "uk_bund_bp": 56.2, "de_jp_10y_bp": 185.1, "chf_funding_advantage_vs_jpy_bp": 60.0}, {"d": "2009-03-31", "fr_bund_bp": 63.0, "btp_bund_bp": 143.8, "uk_bund_bp": 23.0, "de_jp_10y_bp": 169.7, "chf_funding_advantage_vs_jpy_bp": 53.7}, {"d": "2009-04-30", "fr_bund_bp": 52.7, "btp_bund_bp": 122.3, "uk_bund_bp": 27.4, "de_jp_10y_bp": 173.1, "chf_funding_advantage_vs_jpy_bp": 51.0}, {"d": "2009-05-31", "fr_bund_bp": 42.9, "btp_bund_bp": 104.4, "uk_bund_bp": 25.0, "de_jp_10y_bp": 189.0, "chf_funding_advantage_vs_jpy_bp": 47.9}, {"d": "2009-06-30", "fr_bund_bp": 42.6, "btp_bund_bp": 113.2, "uk_bund_bp": 24.8, "de_jp_10y_bp": 211.1, "chf_funding_advantage_vs_jpy_bp": 47.3}, {"d": "2009-07-31", "fr_bund_bp": 39.2, "btp_bund_bp": 103.5, "uk_bund_bp": 48.6, "de_jp_10y_bp": 195.2, "chf_funding_advantage_vs_jpy_bp": 47.8}, {"d": "2009-08-31", "fr_bund_bp": 28.5, "btp_bund_bp": 81.1, "uk_bund_bp": 40.9, "de_jp_10y_bp": 199.1, "chf_funding_advantage_vs_jpy_bp": 46.6}, {"d": "2009-09-30", "fr_bund_bp": 32.7, "btp_bund_bp": 82.5, "uk_bund_bp": 39.3, "de_jp_10y_bp": 200.5, "chf_funding_advantage_vs_jpy_bp": 46.7}, {"d": "2009-10-31", "fr_bund_bp": 35.1, "btp_bund_bp": 89.2, "uk_bund_bp": 36.1, "de_jp_10y_bp": 180.5, "chf_funding_advantage_vs_jpy_bp": 44.5}, {"d": "2009-11-30", "fr_bund_bp": 34.3, "btp_bund_bp": 84.0, "uk_bund_bp": 54.2, "de_jp_10y_bp": 196.4, "chf_funding_advantage_vs_jpy_bp": 39.1}, {"d": "2009-12-31", "fr_bund_bp": 34.1, "btp_bund_bp": 86.8, "uk_bund_bp": 74.9, "de_jp_10y_bp": 186.7, "chf_funding_advantage_vs_jpy_bp": 34.4}, {"d": "2010-01-31", "fr_bund_bp": 26.3, "btp_bund_bp": 82.1, "uk_bund_bp": 74.5, "de_jp_10y_bp": 194.9, "chf_funding_advantage_vs_jpy_bp": 36.0}, {"d": "2010-02-28", "fr_bund_bp": 33.0, "btp_bund_bp": 87.7, "uk_bund_bp": 89.2, "de_jp_10y_bp": 187.5, "chf_funding_advantage_vs_jpy_bp": 34.1}, {"d": "2010-03-31", "fr_bund_bp": 33.8, "btp_bund_bp": 84.3, "uk_bund_bp": 98.9, "de_jp_10y_bp": 174.1, "chf_funding_advantage_vs_jpy_bp": 33.4}, {"d": "2010-04-30", "fr_bund_bp": 33.6, "btp_bund_bp": 93.2, "uk_bund_bp": 103.6, "de_jp_10y_bp": 177.8, "chf_funding_advantage_vs_jpy_bp": 31.2}, {"d": "2010-05-31", "fr_bund_bp": 34.6, "btp_bund_bp": 125.1, "uk_bund_bp": 104.3, "de_jp_10y_bp": 147.7, "chf_funding_advantage_vs_jpy_bp": 30.8}, {"d": "2010-06-30", "fr_bund_bp": 52.7, "btp_bund_bp": 155.9, "uk_bund_bp": 105.8, "de_jp_10y_bp": 146.3, "chf_funding_advantage_vs_jpy_bp": 26.2}, {"d": "2010-07-31", "fr_bund_bp": 37.4, "btp_bund_bp": 141.0, "uk_bund_bp": 89.3, "de_jp_10y_bp": 154.1, "chf_funding_advantage_vs_jpy_bp": 18.7}, {"d": "2010-08-31", "fr_bund_bp": 33.0, "btp_bund_bp": 145.2, "uk_bund_bp": 88.3, "de_jp_10y_bp": 132.7, "chf_funding_advantage_vs_jpy_bp": 15.3}, {"d": "2010-09-30", "fr_bund_bp": 38.0, "btp_bund_bp": 156.2, "uk_bund_bp": 82.7, "de_jp_10y_bp": 140.2, "chf_funding_advantage_vs_jpy_bp": 14.6}, {"d": "2010-10-31", "fr_bund_bp": 37.4, "btp_bund_bp": 145.4, "uk_bund_bp": 72.3, "de_jp_10y_bp": 144.3, "chf_funding_advantage_vs_jpy_bp": 9.2}, {"d": "2010-11-30", "fr_bund_bp": 46.7, "btp_bund_bp": 165.1, "uk_bund_bp": 77.8, "de_jp_10y_bp": 137.2, "chf_funding_advantage_vs_jpy_bp": 15.4}, {"d": "2010-12-31", "fr_bund_bp": 42.5, "btp_bund_bp": 168.8, "uk_bund_bp": 69.5, "de_jp_10y_bp": 178.2, "chf_funding_advantage_vs_jpy_bp": 14.9}, {"d": "2011-01-31", "fr_bund_bp": 42.3, "btp_bund_bp": 171.2, "uk_bund_bp": 71.1, "de_jp_10y_bp": 180.4, "chf_funding_advantage_vs_jpy_bp": 18.9}, {"d": "2011-02-28", "fr_bund_bp": 40.1, "btp_bund_bp": 153.7, "uk_bund_bp": 68.1, "de_jp_10y_bp": 195.8, "chf_funding_advantage_vs_jpy_bp": 20.0}, {"d": "2011-03-31", "fr_bund_bp": 39.8, "btp_bund_bp": 166.3, "uk_bund_bp": 52.7, "de_jp_10y_bp": 199.8, "chf_funding_advantage_vs_jpy_bp": 18.1}, {"d": "2011-04-30", "fr_bund_bp": 34.9, "btp_bund_bp": 150.0, "uk_bund_bp": 42.1, "de_jp_10y_bp": 212.6, "chf_funding_advantage_vs_jpy_bp": 19.3}, {"d": "2011-05-31", "fr_bund_bp": 42.9, "btp_bund_bp": 169.5, "uk_bund_bp": 44.4, "de_jp_10y_bp": 194.3, "chf_funding_advantage_vs_jpy_bp": 21.3}, {"d": "2011-06-30", "fr_bund_bp": 53.9, "btp_bund_bp": 192.5, "uk_bund_bp": 52.3, "de_jp_10y_bp": 180.7, "chf_funding_advantage_vs_jpy_bp": 23.0}, {"d": "2011-07-31", "fr_bund_bp": 65.6, "btp_bund_bp": 271.9, "uk_bund_bp": 57.0, "de_jp_10y_bp": 166.9, "chf_funding_advantage_vs_jpy_bp": 24.1}, {"d": "2011-08-31", "fr_bund_bp": 76.7, "btp_bund_bp": 305.8, "uk_bund_bp": 57.0, "de_jp_10y_bp": 119.0, "chf_funding_advantage_vs_jpy_bp": 39.6}, {"d": "2011-09-30", "fr_bund_bp": 81.1, "btp_bund_bp": 391.7, "uk_bund_bp": 67.5, "de_jp_10y_bp": 85.4, "chf_funding_advantage_vs_jpy_bp": 39.0}, {"d": "2011-10-31", "fr_bund_bp": 98.8, "btp_bund_bp": 397.0, "uk_bund_bp": 52.7, "de_jp_10y_bp": 96.4, "chf_funding_advantage_vs_jpy_bp": 42.3}, {"d": "2011-11-30", "fr_bund_bp": 153.6, "btp_bund_bp": 518.3, "uk_bund_bp": 41.8, "de_jp_10y_bp": 81.2, "chf_funding_advantage_vs_jpy_bp": 39.5}, {"d": "2011-12-31", "fr_bund_bp": 123.2, "btp_bund_bp": 488.4, "uk_bund_bp": 25.5, "de_jp_10y_bp": 95.7, "chf_funding_advantage_vs_jpy_bp": 24.9}, {"d": "2012-01-31", "fr_bund_bp": 135.9, "btp_bund_bp": 471.6, "uk_bund_bp": 28.9, "de_jp_10y_bp": 86.2, "chf_funding_advantage_vs_jpy_bp": 29.0}, {"d": "2012-02-29", "fr_bund_bp": 116.8, "btp_bund_bp": 369.4, "uk_bund_bp": 36.7, "de_jp_10y_bp": 89.0, "chf_funding_advantage_vs_jpy_bp": 31.4}, {"d": "2012-03-31", "fr_bund_bp": 112.0, "btp_bund_bp": 321.9, "uk_bund_bp": 49.3, "de_jp_10y_bp": 86.4, "chf_funding_advantage_vs_jpy_bp": 28.0}, {"d": "2012-04-30", "fr_bund_bp": 136.6, "btp_bund_bp": 405.2, "uk_bund_bp": 58.7, "de_jp_10y_bp": 71.0, "chf_funding_advantage_vs_jpy_bp": 31.8}, {"d": "2012-05-31", "fr_bund_bp": 141.3, "btp_bund_bp": 444.6, "uk_bund_bp": 60.5, "de_jp_10y_bp": 49.1, "chf_funding_advantage_vs_jpy_bp": 34.7}, {"d": "2012-06-30", "fr_bund_bp": 127.0, "btp_bund_bp": 460.4, "uk_bund_bp": 46.9, "de_jp_10y_bp": 51.1, "chf_funding_advantage_vs_jpy_bp": 39.2}, {"d": "2012-07-31", "fr_bund_bp": 103.8, "btp_bund_bp": 475.4, "uk_bund_bp": 41.0, "de_jp_10y_bp": 46.2, "chf_funding_advantage_vs_jpy_bp": 50.1}, {"d": "2012-08-31", "fr_bund_bp": 77.8, "btp_bund_bp": 448.0, "uk_bund_bp": 33.2, "de_jp_10y_bp": 54.2, "chf_funding_advantage_vs_jpy_bp": 53.5}, {"d": "2012-09-30", "fr_bund_bp": 75.0, "btp_bund_bp": 376.4, "uk_bund_bp": 23.2, "de_jp_10y_bp": 73.3, "chf_funding_advantage_vs_jpy_bp": 47.8}, {"d": "2012-10-31", "fr_bund_bp": 72.3, "btp_bund_bp": 348.6, "uk_bund_bp": 30.5, "de_jp_10y_bp": 70.7, "chf_funding_advantage_vs_jpy_bp": 39.0}, {"d": "2012-11-30", "fr_bund_bp": 80.4, "btp_bund_bp": 351.5, "uk_bund_bp": 43.8, "de_jp_10y_bp": 62.3, "chf_funding_advantage_vs_jpy_bp": 46.3}, {"d": "2012-12-31", "fr_bund_bp": 71.1, "btp_bund_bp": 324.3, "uk_bund_bp": 54.7, "de_jp_10y_bp": 51.8, "chf_funding_advantage_vs_jpy_bp": 36.0}, {"d": "2013-01-31", "fr_bund_bp": 65.8, "btp_bund_bp": 269.6, "uk_bund_bp": 56.7, "de_jp_10y_bp": 73.7, "chf_funding_advantage_vs_jpy_bp": 40.0}, {"d": "2013-02-28", "fr_bund_bp": 69.7, "btp_bund_bp": 295.0, "uk_bund_bp": 63.5, "de_jp_10y_bp": 87.5, "chf_funding_advantage_vs_jpy_bp": 33.3}, {"d": "2013-03-31", "fr_bund_bp": 71.5, "btp_bund_bp": 328.6, "uk_bund_bp": 62.2, "de_jp_10y_bp": 86.2, "chf_funding_advantage_vs_jpy_bp": 31.0}, {"d": "2013-04-30", "fr_bund_bp": 60.4, "btp_bund_bp": 308.2, "uk_bund_bp": 58.6, "de_jp_10y_bp": 60.7, "chf_funding_advantage_vs_jpy_bp": 29.3}, {"d": "2013-05-31", "fr_bund_bp": 57.6, "btp_bund_bp": 267.0, "uk_bund_bp": 65.2, "de_jp_10y_bp": 41.5, "chf_funding_advantage_vs_jpy_bp": 28.7}, {"d": "2013-06-30", "fr_bund_bp": 68.0, "btp_bund_bp": 284.8, "uk_bund_bp": 77.6, "de_jp_10y_bp": 70.9, "chf_funding_advantage_vs_jpy_bp": 28.8}, {"d": "2013-07-31", "fr_bund_bp": 68.4, "btp_bund_bp": 285.2, "uk_bund_bp": 90.5, "de_jp_10y_bp": 77.6, "chf_funding_advantage_vs_jpy_bp": 28.4}, {"d": "2013-08-31", "fr_bund_bp": 62.5, "btp_bund_bp": 268.4, "uk_bund_bp": 97.4, "de_jp_10y_bp": 102.7, "chf_funding_advantage_vs_jpy_bp": 28.9}, {"d": "2013-09-30", "fr_bund_bp": 60.2, "btp_bund_bp": 265.3, "uk_bund_bp": 95.6, "de_jp_10y_bp": 121.9, "chf_funding_advantage_vs_jpy_bp": 27.9}, {"d": "2013-10-31", "fr_bund_bp": 62.8, "btp_bund_bp": 248.6, "uk_bund_bp": 91.6, "de_jp_10y_bp": 117.2, "chf_funding_advantage_vs_jpy_bp": 20.5}, {"d": "2013-11-30", "fr_bund_bp": 59.3, "btp_bund_bp": 241.8, "uk_bund_bp": 108.3, "de_jp_10y_bp": 107.2, "chf_funding_advantage_vs_jpy_bp": 23.7}, {"d": "2013-12-31", "fr_bund_bp": 53.2, "btp_bund_bp": 231.6, "uk_bund_bp": 114.8, "de_jp_10y_bp": 111.0, "chf_funding_advantage_vs_jpy_bp": 20.3}, {"d": "2014-01-31", "fr_bund_bp": 62.4, "btp_bund_bp": 211.0, "uk_bund_bp": 115.4, "de_jp_10y_bp": 114.2, "chf_funding_advantage_vs_jpy_bp": 26.3}, {"d": "2014-02-28", "fr_bund_bp": 69.2, "btp_bund_bp": 209.2, "uk_bund_bp": 125.6, "de_jp_10y_bp": 97.2, "chf_funding_advantage_vs_jpy_bp": 26.0}, {"d": "2014-03-31", "fr_bund_bp": 64.1, "btp_bund_bp": 189.0, "uk_bund_bp": 127.5, "de_jp_10y_bp": 90.4, "chf_funding_advantage_vs_jpy_bp": 25.2}, {"d": "2014-04-30", "fr_bund_bp": 57.3, "btp_bund_bp": 177.2, "uk_bund_bp": 128.5, "de_jp_10y_bp": 84.6, "chf_funding_advantage_vs_jpy_bp": 24.1}, {"d": "2014-05-31", "fr_bund_bp": 51.3, "btp_bund_bp": 179.6, "uk_bund_bp": 137.2, "de_jp_10y_bp": 76.1, "chf_funding_advantage_vs_jpy_bp": 24.2}, {"d": "2014-06-30", "fr_bund_bp": 44.6, "btp_bund_bp": 165.6, "uk_bund_bp": 152.0, "de_jp_10y_bp": 72.8, "chf_funding_advantage_vs_jpy_bp": 22.2}, {"d": "2014-07-31", "fr_bund_bp": 44.6, "btp_bund_bp": 168.0, "uk_bund_bp": 162.0, "de_jp_10y_bp": 58.7, "chf_funding_advantage_vs_jpy_bp": 17.7}, {"d": "2014-08-31", "fr_bund_bp": 45.4, "btp_bund_bp": 167.7, "uk_bund_bp": 157.9, "de_jp_10y_bp": 46.8, "chf_funding_advantage_vs_jpy_bp": 17.2}, {"d": "2014-09-30", "fr_bund_bp": 42.9, "btp_bund_bp": 147.9, "uk_bund_bp": 157.1, "de_jp_10y_bp": 42.4, "chf_funding_advantage_vs_jpy_bp": 18.5}, {"d": "2014-10-31", "fr_bund_bp": 46.9, "btp_bund_bp": 163.3, "uk_bund_bp": 145.6, "de_jp_10y_bp": 32.6, "chf_funding_advantage_vs_jpy_bp": 15.2}, {"d": "2014-11-30", "fr_bund_bp": 42.1, "btp_bund_bp": 157.1, "uk_bund_bp": 144.0, "de_jp_10y_bp": 29.9, "chf_funding_advantage_vs_jpy_bp": 14.1}, {"d": "2014-12-31", "fr_bund_bp": 33.1, "btp_bund_bp": 140.1, "uk_bund_bp": 134.0, "de_jp_10y_bp": 25.9, "chf_funding_advantage_vs_jpy_bp": 13.9}, {"d": "2015-01-31", "fr_bund_bp": 28.0, "btp_bund_bp": 131.2, "uk_bund_bp": 119.9, "de_jp_10y_bp": 11.5, "chf_funding_advantage_vs_jpy_bp": 59.0}, {"d": "2015-02-28", "fr_bund_bp": 29.8, "btp_bund_bp": 125.5, "uk_bund_bp": 143.4, "de_jp_10y_bp": -2.8, "chf_funding_advantage_vs_jpy_bp": 84.6}, {"d": "2015-03-31", "fr_bund_bp": 28.3, "btp_bund_bp": 106.7, "uk_bund_bp": 156.7, "de_jp_10y_bp": -17.3, "chf_funding_advantage_vs_jpy_bp": 95.9}, {"d": "2015-04-30", "fr_bund_bp": 31.8, "btp_bund_bp": 123.5, "uk_bund_bp": 163.3, "de_jp_10y_bp": -21.8, "chf_funding_advantage_vs_jpy_bp": 85.5}, {"d": "2015-05-31", "fr_bund_bp": 33.4, "btp_bund_bp": 125.6, "uk_bund_bp": 146.9, "de_jp_10y_bp": 16.6, "chf_funding_advantage_vs_jpy_bp": 98.4}, {"d": "2015-06-30", "fr_bund_bp": 40.7, "btp_bund_bp": 140.6, "uk_bund_bp": 137.7, "de_jp_10y_bp": 33.8, "chf_funding_advantage_vs_jpy_bp": 93.7}, {"d": "2015-07-31", "fr_bund_bp": 40.0, "btp_bund_bp": 133.2, "uk_bund_bp": 142.5, "de_jp_10y_bp": 30.0, "chf_funding_advantage_vs_jpy_bp": 91.3}, {"d": "2015-08-31", "fr_bund_bp": 40.1, "btp_bund_bp": 123.0, "uk_bund_bp": 137.1, "de_jp_10y_bp": 22.9, "chf_funding_advantage_vs_jpy_bp": 95.0}, {"d": "2015-09-30", "fr_bund_bp": 34.6, "btp_bund_bp": 126.6, "uk_bund_bp": 122.7, "de_jp_10y_bp": 30.4, "chf_funding_advantage_vs_jpy_bp": 92.5}, {"d": "2015-10-31", "fr_bund_bp": 35.2, "btp_bund_bp": 117.8, "uk_bund_bp": 132.8, "de_jp_10y_bp": 21.8, "chf_funding_advantage_vs_jpy_bp": 101.4}, {"d": "2015-11-30", "fr_bund_bp": 36.4, "btp_bund_bp": 105.4, "uk_bund_bp": 146.2, "de_jp_10y_bp": 21.6, "chf_funding_advantage_vs_jpy_bp": 85.0}, {"d": "2015-12-31", "fr_bund_bp": 38.5, "btp_bund_bp": 103.3, "uk_bund_bp": 137.8, "de_jp_10y_bp": 27.5, "chf_funding_advantage_vs_jpy_bp": 90.9}, {"d": "2016-01-31", "fr_bund_bp": 41.0, "btp_bund_bp": 110.3, "uk_bund_bp": 135.3, "de_jp_10y_bp": 33.6, "chf_funding_advantage_vs_jpy_bp": 91.5}, {"d": "2016-02-29", "fr_bund_bp": 41.7, "btp_bund_bp": 138.5, "uk_bund_bp": 133.0, "de_jp_10y_bp": 23.8, "chf_funding_advantage_vs_jpy_bp": 98.7}, {"d": "2016-03-31", "fr_bund_bp": 33.9, "btp_bund_bp": 120.4, "uk_bund_bp": 137.2, "de_jp_10y_bp": 22.1, "chf_funding_advantage_vs_jpy_bp": 87.2}, {"d": "2016-04-30", "fr_bund_bp": 37.6, "btp_bund_bp": 130.8, "uk_bund_bp": 143.5, "de_jp_10y_bp": 21.9, "chf_funding_advantage_vs_jpy_bp": 80.7}, {"d": "2016-05-31", "fr_bund_bp": 37.7, "btp_bund_bp": 139.3, "uk_bund_bp": 140.4, "de_jp_10y_bp": 25.3, "chf_funding_advantage_vs_jpy_bp": 82.5}, {"d": "2016-06-30", "fr_bund_bp": 40.7, "btp_bund_bp": 147.0, "uk_bund_bp": 132.7, "de_jp_10y_bp": 21.3, "chf_funding_advantage_vs_jpy_bp": 77.8}, {"d": "2016-07-31", "fr_bund_bp": 32.4, "btp_bund_bp": 138.1, "uk_bund_bp": 111.1, "de_jp_10y_bp": 4.1, "chf_funding_advantage_vs_jpy_bp": 82.8}, {"d": "2016-08-31", "fr_bund_bp": 28.2, "btp_bund_bp": 130.8, "uk_bund_bp": 87.4, "de_jp_10y_bp": -6.2, "chf_funding_advantage_vs_jpy_bp": 80.8}, {"d": "2016-09-30", "fr_bund_bp": 26.4, "btp_bund_bp": 135.0, "uk_bund_bp": 90.8, "de_jp_10y_bp": 0.1, "chf_funding_advantage_vs_jpy_bp": 80.6}, {"d": "2016-10-31", "fr_bund_bp": 32.8, "btp_bund_bp": 144.8, "uk_bund_bp": 107.6, "de_jp_10y_bp": 5.2, "chf_funding_advantage_vs_jpy_bp": 80.6}, {"d": "2016-11-30", "fr_bund_bp": 48.1, "btp_bund_bp": 175.4, "uk_bund_bp": 119.3, "de_jp_10y_bp": 16.9, "chf_funding_advantage_vs_jpy_bp": 81.6}, {"d": "2016-12-31", "fr_bund_bp": 49.8, "btp_bund_bp": 163.4, "uk_bund_bp": 118.2, "de_jp_10y_bp": 21.2, "chf_funding_advantage_vs_jpy_bp": 85.6}, {"d": "2017-01-31", "fr_bund_bp": 60.9, "btp_bund_bp": 174.0, "uk_bund_bp": 116.9, "de_jp_10y_bp": 16.6, "chf_funding_advantage_vs_jpy_bp": 98.6}, {"d": "2017-02-28", "fr_bund_bp": 77.2, "btp_bund_bp": 209.4, "uk_bund_bp": 104.8, "de_jp_10y_bp": 20.8, "chf_funding_advantage_vs_jpy_bp": 86.0}, {"d": "2017-03-31", "fr_bund_bp": 67.2, "btp_bund_bp": 205.3, "uk_bund_bp": 84.6, "de_jp_10y_bp": 28.3, "chf_funding_advantage_vs_jpy_bp": 87.1}, {"d": "2017-04-30", "fr_bund_bp": 65.4, "btp_bund_bp": 203.1, "uk_bund_bp": 85.3, "de_jp_10y_bp": 21.1, "chf_funding_advantage_vs_jpy_bp": 84.6}, {"d": "2017-05-31", "fr_bund_bp": 47.4, "btp_bund_bp": 185.8, "uk_bund_bp": 78.1, "de_jp_10y_bp": 29.6, "chf_funding_advantage_vs_jpy_bp": 95.4}, {"d": "2017-06-30", "fr_bund_bp": 41.0, "btp_bund_bp": 180.3, "uk_bund_bp": 83.4, "de_jp_10y_bp": 17.5, "chf_funding_advantage_vs_jpy_bp": 83.1}, {"d": "2017-07-31", "fr_bund_bp": 38.4, "btp_bund_bp": 177.5, "uk_bund_bp": 81.6, "de_jp_10y_bp": 38.1, "chf_funding_advantage_vs_jpy_bp": 88.1}, {"d": "2017-08-31", "fr_bund_bp": 36.4, "btp_bund_bp": 176.4, "uk_bund_bp": 77.8, "de_jp_10y_bp": 33.6, "chf_funding_advantage_vs_jpy_bp": 87.1}, {"d": "2017-09-30", "fr_bund_bp": 35.3, "btp_bund_bp": 176.2, "uk_bund_bp": 89.6, "de_jp_10y_bp": 28.7, "chf_funding_advantage_vs_jpy_bp": 90.1}, {"d": "2017-10-31", "fr_bund_bp": 43.8, "btp_bund_bp": 170.1, "uk_bund_bp": 100.9, "de_jp_10y_bp": 30.8, "chf_funding_advantage_vs_jpy_bp": 98.8}, {"d": "2017-11-30", "fr_bund_bp": 41.2, "btp_bund_bp": 148.1, "uk_bund_bp": 102.2, "de_jp_10y_bp": 27.3, "chf_funding_advantage_vs_jpy_bp": 97.0}, {"d": "2017-12-31", "fr_bund_bp": 37.3, "btp_bund_bp": 149.8, "uk_bund_bp": 98.1, "de_jp_10y_bp": 25.2, "chf_funding_advantage_vs_jpy_bp": 92.7}, {"d": "2018-01-31", "fr_bund_bp": 37.5, "btp_bund_bp": 150.9, "uk_bund_bp": 91.9, "de_jp_10y_bp": 39.5, "chf_funding_advantage_vs_jpy_bp": 94.0}, {"d": "2018-02-28", "fr_bund_bp": 32.1, "btp_bund_bp": 142.2, "uk_bund_bp": 94.4, "de_jp_10y_bp": 61.4, "chf_funding_advantage_vs_jpy_bp": 94.0}, {"d": "2018-03-31", "fr_bund_bp": 30.0, "btp_bund_bp": 143.5, "uk_bund_bp": 97.8, "de_jp_10y_bp": 48.5, "chf_funding_advantage_vs_jpy_bp": 89.2}, {"d": "2018-04-30", "fr_bund_bp": 30.0, "btp_bund_bp": 129.3, "uk_bund_bp": 103.1, "de_jp_10y_bp": 43.0, "chf_funding_advantage_vs_jpy_bp": 89.7}, {"d": "2018-05-31", "fr_bund_bp": 34.0, "btp_bund_bp": 173.0, "uk_bund_bp": 105.2, "de_jp_10y_bp": 42.0, "chf_funding_advantage_vs_jpy_bp": 86.4}, {"d": "2018-06-30", "fr_bund_bp": 42.3, "btp_bund_bp": 241.7, "uk_bund_bp": 109.6, "de_jp_10y_bp": 29.7, "chf_funding_advantage_vs_jpy_bp": 86.8}, {"d": "2018-07-31", "fr_bund_bp": 39.5, "btp_bund_bp": 236.8, "uk_bund_bp": 109.9, "de_jp_10y_bp": 21.5, "chf_funding_advantage_vs_jpy_bp": 87.1}, {"d": "2018-08-31", "fr_bund_bp": 40.9, "btp_bund_bp": 287.0, "uk_bund_bp": 110.8, "de_jp_10y_bp": 18.1, "chf_funding_advantage_vs_jpy_bp": 86.8}, {"d": "2018-09-30", "fr_bund_bp": 40.0, "btp_bund_bp": 258.9, "uk_bund_bp": 113.2, "de_jp_10y_bp": 24.6, "chf_funding_advantage_vs_jpy_bp": 83.0}, {"d": "2018-10-31", "fr_bund_bp": 42.1, "btp_bund_bp": 307.0, "uk_bund_bp": 114.7, "de_jp_10y_bp": 26.9, "chf_funding_advantage_vs_jpy_bp": 88.1}, {"d": "2018-11-30", "fr_bund_bp": 44.6, "btp_bund_bp": 307.6, "uk_bund_bp": 114.0, "de_jp_10y_bp": 22.9, "chf_funding_advantage_vs_jpy_bp": 86.5}, {"d": "2018-12-31", "fr_bund_bp": 51.3, "btp_bund_bp": 278.8, "uk_bund_bp": 112.5, "de_jp_10y_bp": 19.7, "chf_funding_advantage_vs_jpy_bp": 82.6}, {"d": "2019-01-31", "fr_bund_bp": 51.7, "btp_bund_bp": 263.7, "uk_bund_bp": 118.9, "de_jp_10y_bp": 13.3, "chf_funding_advantage_vs_jpy_bp": 84.4}, {"d": "2019-02-28", "fr_bund_bp": 49.5, "btp_bund_bp": 275.6, "uk_bund_bp": 118.3, "de_jp_10y_bp": 7.1, "chf_funding_advantage_vs_jpy_bp": 79.9}, {"d": "2019-03-31", "fr_bund_bp": 42.9, "btp_bund_bp": 267.9, "uk_bund_bp": 117.9, "de_jp_10y_bp": 10.6, "chf_funding_advantage_vs_jpy_bp": 80.7}, {"d": "2019-04-30", "fr_bund_bp": 41.0, "btp_bund_bp": 265.8, "uk_bund_bp": 123.0, "de_jp_10y_bp": 0.5, "chf_funding_advantage_vs_jpy_bp": 79.8}, {"d": "2019-05-31", "fr_bund_bp": 43.5, "btp_bund_bp": 277.9, "uk_bund_bp": 126.5, "de_jp_10y_bp": -4.0, "chf_funding_advantage_vs_jpy_bp": 82.4}, {"d": "2019-06-30", "fr_bund_bp": 39.5, "btp_bund_bp": 259.9, "uk_bund_bp": 123.4, "de_jp_10y_bp": -15.0, "chf_funding_advantage_vs_jpy_bp": 83.0}, {"d": "2019-07-31", "fr_bund_bp": 31.8, "btp_bund_bp": 204.2, "uk_bund_bp": 121.9, "de_jp_10y_bp": -22.8, "chf_funding_advantage_vs_jpy_bp": 88.9}, {"d": "2019-08-31", "fr_bund_bp": 30.9, "btp_bund_bp": 205.3, "uk_bund_bp": 122.7, "de_jp_10y_bp": -36.9, "chf_funding_advantage_vs_jpy_bp": 81.7}, {"d": "2019-09-30", "fr_bund_bp": 32.5, "btp_bund_bp": 149.7, "uk_bund_bp": 119.3, "de_jp_10y_bp": -38.0, "chf_funding_advantage_vs_jpy_bp": 80.0}, {"d": "2019-10-31", "fr_bund_bp": 31.0, "btp_bund_bp": 147.4, "uk_bund_bp": 110.7, "de_jp_10y_bp": -32.0, "chf_funding_advantage_vs_jpy_bp": 76.6}, {"d": "2019-11-30", "fr_bund_bp": 33.2, "btp_bund_bp": 161.8, "uk_bund_bp": 111.7, "de_jp_10y_bp": -27.2, "chf_funding_advantage_vs_jpy_bp": 72.4}, {"d": "2019-12-31", "fr_bund_bp": 33.9, "btp_bund_bp": 166.9, "uk_bund_bp": 113.0, "de_jp_10y_bp": -27.4, "chf_funding_advantage_vs_jpy_bp": 75.8}, {"d": "2020-01-31", "fr_bund_bp": 30.4, "btp_bund_bp": 158.9, "uk_bund_bp": 103.7, "de_jp_10y_bp": -24.9, "chf_funding_advantage_vs_jpy_bp": 77.0}, {"d": "2020-02-29", "fr_bund_bp": 28.6, "btp_bund_bp": 142.1, "uk_bund_bp": 109.9, "de_jp_10y_bp": -31.1, "chf_funding_advantage_vs_jpy_bp": 73.7}, {"d": "2020-03-31", "fr_bund_bp": 49.1, "btp_bund_bp": 209.2, "uk_bund_bp": 100.2, "de_jp_10y_bp": -54.6, "chf_funding_advantage_vs_jpy_bp": 68.1}, {"d": "2020-04-30", "fr_bund_bp": 51.0, "btp_bund_bp": 224.8, "uk_bund_bp": 80.7, "de_jp_10y_bp": -41.0, "chf_funding_advantage_vs_jpy_bp": 58.6}, {"d": "2020-05-31", "fr_bund_bp": 48.6, "btp_bund_bp": 227.8, "uk_bund_bp": 79.1, "de_jp_10y_bp": -51.6, "chf_funding_advantage_vs_jpy_bp": 62.1}, {"d": "2020-06-30", "fr_bund_bp": 39.4, "btp_bund_bp": 188.9, "uk_bund_bp": 71.2, "de_jp_10y_bp": -46.4, "chf_funding_advantage_vs_jpy_bp": 62.4}, {"d": "2020-07-31", "fr_bund_bp": 37.3, "btp_bund_bp": 171.9, "uk_bund_bp": 73.2, "de_jp_10y_bp": -53.3, "chf_funding_advantage_vs_jpy_bp": 62.6}, {"d": "2020-08-31", "fr_bund_bp": 35.3, "btp_bund_bp": 155.5, "uk_bund_bp": 79.5, "de_jp_10y_bp": -56.8, "chf_funding_advantage_vs_jpy_bp": 64.2}, {"d": "2020-09-30", "fr_bund_bp": 31.4, "btp_bund_bp": 150.5, "uk_bund_bp": 79.7, "de_jp_10y_bp": -53.9, "chf_funding_advantage_vs_jpy_bp": 65.4}, {"d": "2020-10-31", "fr_bund_bp": 30.7, "btp_bund_bp": 137.7, "uk_bund_bp": 91.3, "de_jp_10y_bp": -64.7, "chf_funding_advantage_vs_jpy_bp": 64.3}, {"d": "2020-11-30", "fr_bund_bp": 29.5, "btp_bund_bp": 127.9, "uk_bund_bp": 99.8, "de_jp_10y_bp": -64.5, "chf_funding_advantage_vs_jpy_bp": 67.5}, {"d": "2020-12-31", "fr_bund_bp": 27.9, "btp_bund_bp": 119.7, "uk_bund_bp": 94.1, "de_jp_10y_bp": -63.9, "chf_funding_advantage_vs_jpy_bp": 68.8}, {"d": "2021-01-31", "fr_bund_bp": 27.4, "btp_bund_bp": 120.0, "uk_bund_bp": 95.1, "de_jp_10y_bp": -63.9, "chf_funding_advantage_vs_jpy_bp": 67.5}, {"d": "2021-02-28", "fr_bund_bp": 29.5, "btp_bund_bp": 103.5, "uk_bund_bp": 106.8, "de_jp_10y_bp": -59.5, "chf_funding_advantage_vs_jpy_bp": 67.7}, {"d": "2021-03-31", "fr_bund_bp": 29.5, "btp_bund_bp": 106.9, "uk_bund_bp": 121.0, "de_jp_10y_bp": -48.5, "chf_funding_advantage_vs_jpy_bp": 66.5}, {"d": "2021-04-30", "fr_bund_bp": 31.5, "btp_bund_bp": 112.2, "uk_bund_bp": 117.7, "de_jp_10y_bp": -41.5, "chf_funding_advantage_vs_jpy_bp": 66.4}, {"d": "2021-05-31", "fr_bund_bp": 43.4, "btp_bund_bp": 120.8, "uk_bund_bp": 112.9, "de_jp_10y_bp": -30.4, "chf_funding_advantage_vs_jpy_bp": 67.0}, {"d": "2021-06-30", "fr_bund_bp": 43.9, "btp_bund_bp": 116.4, "uk_bund_bp": 114.4, "de_jp_10y_bp": -33.9, "chf_funding_advantage_vs_jpy_bp": 66.6}, {"d": "2021-07-31", "fr_bund_bp": 44.1, "btp_bund_bp": 119.9, "uk_bund_bp": 114.9, "de_jp_10y_bp": -46.6, "chf_funding_advantage_vs_jpy_bp": 66.4}, {"d": "2021-08-31", "fr_bund_bp": 41.9, "btp_bund_bp": 116.7, "uk_bund_bp": 118.3, "de_jp_10y_bp": -55.9, "chf_funding_advantage_vs_jpy_bp": 66.6}, {"d": "2021-09-30", "fr_bund_bp": 40.3, "btp_bund_bp": 114.0, "uk_bund_bp": 116.5, "de_jp_10y_bp": -42.8, "chf_funding_advantage_vs_jpy_bp": 74.8}, {"d": "2021-10-31", "fr_bund_bp": 40.4, "btp_bund_bp": 115.9, "uk_bund_bp": 128.7, "de_jp_10y_bp": -29.9, "chf_funding_advantage_vs_jpy_bp": 65.5}, {"d": "2021-11-30", "fr_bund_bp": 41.4, "btp_bund_bp": 132.4, "uk_bund_bp": 125.3, "de_jp_10y_bp": -36.4, "chf_funding_advantage_vs_jpy_bp": 62.2}, {"d": "2021-12-31", "fr_bund_bp": 43.4, "btp_bund_bp": 143.1, "uk_bund_bp": 122.2, "de_jp_10y_bp": -45.4, "chf_funding_advantage_vs_jpy_bp": 66.8}, {"d": "2022-01-31", "fr_bund_bp": 42.5, "btp_bund_bp": 146.1, "uk_bund_bp": 132.0, "de_jp_10y_bp": -28.5, "chf_funding_advantage_vs_jpy_bp": 66.5}, {"d": "2022-02-28", "fr_bund_bp": 53.0, "btp_bund_bp": 164.4, "uk_bund_bp": 133.9, "de_jp_10y_bp": -3.0, "chf_funding_advantage_vs_jpy_bp": 63.6}, {"d": "2022-03-31", "fr_bund_bp": 49.8, "btp_bund_bp": 157.2, "uk_bund_bp": 126.4, "de_jp_10y_bp": 7.2, "chf_funding_advantage_vs_jpy_bp": 63.3}, {"d": "2022-04-30", "fr_bund_bp": 53.4, "btp_bund_bp": 169.0, "uk_bund_bp": 109.0, "de_jp_10y_bp": 53.1, "chf_funding_advantage_vs_jpy_bp": 62.3}, {"d": "2022-05-31", "fr_bund_bp": 56.7, "btp_bund_bp": 203.7, "uk_bund_bp": 95.4, "de_jp_10y_bp": 71.8, "chf_funding_advantage_vs_jpy_bp": 63.6}, {"d": "2022-06-30", "fr_bund_bp": 61.5, "btp_bund_bp": 219.0, "uk_bund_bp": 93.7, "de_jp_10y_bp": 122.0, "chf_funding_advantage_vs_jpy_bp": 51.4}, {"d": "2022-07-31", "fr_bund_bp": 62.8, "btp_bund_bp": 227.7, "uk_bund_bp": 106.3, "de_jp_10y_bp": 90.2, "chf_funding_advantage_vs_jpy_bp": 7.9}, {"d": "2022-08-31", "fr_bund_bp": 65.6, "btp_bund_bp": 226.3, "uk_bund_bp": 129.3, "de_jp_10y_bp": 81.4, "chf_funding_advantage_vs_jpy_bp": 0.5}, {"d": "2022-09-30", "fr_bund_bp": 61.5, "btp_bund_bp": 234.3, "uk_bund_bp": 170.5, "de_jp_10y_bp": 155.5, "chf_funding_advantage_vs_jpy_bp": -16.3}, {"d": "2022-10-31", "fr_bund_bp": 58.3, "btp_bund_bp": 234.5, "uk_bund_bp": 192.3, "de_jp_10y_bp": 194.2, "chf_funding_advantage_vs_jpy_bp": -54.5}, {"d": "2022-11-30", "fr_bund_bp": 51.4, "btp_bund_bp": 217.7, "uk_bund_bp": 135.1, "de_jp_10y_bp": 181.6, "chf_funding_advantage_vs_jpy_bp": -55.6}, {"d": "2022-12-31", "fr_bund_bp": 53.5, "btp_bund_bp": 217.2, "uk_bund_bp": 141.6, "de_jp_10y_bp": 167.5, "chf_funding_advantage_vs_jpy_bp": -75.1}, {"d": "2023-01-31", "fr_bund_bp": 49.7, "btp_bund_bp": 205.0, "uk_bund_bp": 131.9, "de_jp_10y_bp": 170.3, "chf_funding_advantage_vs_jpy_bp": -99.3}, {"d": "2023-02-28", "fr_bund_bp": 50.0, "btp_bund_bp": 189.9, "uk_bund_bp": 118.5, "de_jp_10y_bp": 187.1, "chf_funding_advantage_vs_jpy_bp": -99.9}, {"d": "2023-03-31", "fr_bund_bp": 53.7, "btp_bund_bp": 185.7, "uk_bund_bp": 118.0, "de_jp_10y_bp": 206.3, "chf_funding_advantage_vs_jpy_bp": -137.2}, {"d": "2023-04-30", "fr_bund_bp": 54.1, "btp_bund_bp": 187.5, "uk_bund_bp": 129.1, "de_jp_10y_bp": 197.4, "chf_funding_advantage_vs_jpy_bp": -145.1}, {"d": "2023-05-31", "fr_bund_bp": 59.8, "btp_bund_bp": 197.1, "uk_bund_bp": 162.0, "de_jp_10y_bp": 191.2, "chf_funding_advantage_vs_jpy_bp": -146.9}, {"d": "2023-06-30", "fr_bund_bp": 55.4, "btp_bund_bp": 169.8, "uk_bund_bp": 199.0, "de_jp_10y_bp": 198.1, "chf_funding_advantage_vs_jpy_bp": -159.3}, {"d": "2023-07-31", "fr_bund_bp": 58.3, "btp_bund_bp": 170.0, "uk_bund_bp": 198.1, "de_jp_10y_bp": 186.2, "chf_funding_advantage_vs_jpy_bp": -172.3}, {"d": "2023-08-31", "fr_bund_bp": 56.4, "btp_bund_bp": 167.5, "uk_bund_bp": 198.4, "de_jp_10y_bp": 190.6, "chf_funding_advantage_vs_jpy_bp": -177.0}, {"d": "2023-09-30", "fr_bund_bp": 57.9, "btp_bund_bp": 185.2, "uk_bund_bp": 175.8, "de_jp_10y_bp": 189.6, "chf_funding_advantage_vs_jpy_bp": -174.6}, {"d": "2023-10-31", "fr_bund_bp": 62.7, "btp_bund_bp": 206.2, "uk_bund_bp": 174.6, "de_jp_10y_bp": 187.3, "chf_funding_advantage_vs_jpy_bp": -178.2}, {"d": "2023-11-30", "fr_bund_bp": 58.9, "btp_bund_bp": 182.7, "uk_bund_bp": 167.1, "de_jp_10y_bp": 194.1, "chf_funding_advantage_vs_jpy_bp": -170.8}, {"d": "2023-12-31", "fr_bund_bp": 54.8, "btp_bund_bp": 171.9, "uk_bund_bp": 176.0, "de_jp_10y_bp": 148.2, "chf_funding_advantage_vs_jpy_bp": -160.1}, {"d": "2024-01-31", "fr_bund_bp": 56.5, "btp_bund_bp": 163.6, "uk_bund_bp": 175.7, "de_jp_10y_bp": 144.5, "chf_funding_advantage_vs_jpy_bp": -166.0}, {"d": "2024-02-29", "fr_bund_bp": 51.8, "btp_bund_bp": 154.0, "uk_bund_bp": 179.1, "de_jp_10y_bp": 162.2, "chf_funding_advantage_vs_jpy_bp": -167.3}, {"d": "2024-03-31", "fr_bund_bp": 47.0, "btp_bund_bp": 134.7, "uk_bund_bp": 168.4, "de_jp_10y_bp": 162.4, "chf_funding_advantage_vs_jpy_bp": -139.1}, {"d": "2024-04-30", "fr_bund_bp": 52.4, "btp_bund_bp": 141.0, "uk_bund_bp": 177.1, "de_jp_10y_bp": 157.6, "chf_funding_advantage_vs_jpy_bp": -139.1}, {"d": "2024-05-31", "fr_bund_bp": 51.0, "btp_bund_bp": 132.4, "uk_bund_bp": 170.3, "de_jp_10y_bp": 145.0, "chf_funding_advantage_vs_jpy_bp": -137.1}, {"d": "2024-06-30", "fr_bund_bp": 66.5, "btp_bund_bp": 145.8, "uk_bund_bp": 168.0, "de_jp_10y_bp": 143.5, "chf_funding_advantage_vs_jpy_bp": -127.8}, {"d": "2024-07-31", "fr_bund_bp": 68.2, "btp_bund_bp": 137.2, "uk_bund_bp": 168.0, "de_jp_10y_bp": 141.3, "chf_funding_advantage_vs_jpy_bp": -102.7}, {"d": "2024-08-31", "fr_bund_bp": 73.2, "btp_bund_bp": 147.4, "uk_bund_bp": 173.7, "de_jp_10y_bp": 131.8, "chf_funding_advantage_vs_jpy_bp": -81.1}, {"d": "2024-09-30", "fr_bund_bp": 73.3, "btp_bund_bp": 139.8, "uk_bund_bp": 173.8, "de_jp_10y_bp": 131.2, "chf_funding_advantage_vs_jpy_bp": -76.6}, {"d": "2024-10-31", "fr_bund_bp": 76.0, "btp_bund_bp": 127.1, "uk_bund_bp": 197.0, "de_jp_10y_bp": 129.5, "chf_funding_advantage_vs_jpy_bp": -63.8}, {"d": "2024-11-30", "fr_bund_bp": 78.4, "btp_bund_bp": 126.3, "uk_bund_bp": 211.1, "de_jp_10y_bp": 125.6, "chf_funding_advantage_vs_jpy_bp": -44.5}, {"d": "2024-12-31", "fr_bund_bp": 83.1, "btp_bund_bp": 114.2, "uk_bund_bp": 225.6, "de_jp_10y_bp": 108.9, "chf_funding_advantage_vs_jpy_bp": -21.5}, {"d": "2025-01-31", "fr_bund_bp": 83.6, "btp_bund_bp": 119.2, "uk_bund_bp": 217.9, "de_jp_10y_bp": 123.9, "chf_funding_advantage_vs_jpy_bp": 35.9}, {"d": "2025-02-28", "fr_bund_bp": 74.4, "btp_bund_bp": 117.0, "uk_bund_bp": 210.1, "de_jp_10y_bp": 103.5, "chf_funding_advantage_vs_jpy_bp": 42.1}, {"d": "2025-03-31", "fr_bund_bp": 68.9, "btp_bund_bp": 114.6, "uk_bund_bp": 190.3, "de_jp_10y_bp": 125.6, "chf_funding_advantage_vs_jpy_bp": 50.8}, {"d": "2025-04-30", "fr_bund_bp": 74.9, "btp_bund_bp": 120.2, "uk_bund_bp": 206.6, "de_jp_10y_bp": 120.0, "chf_funding_advantage_vs_jpy_bp": 62.8}, {"d": "2025-05-31", "fr_bund_bp": 69.7, "btp_bund_bp": 106.6, "uk_bund_bp": 203.8, "de_jp_10y_bp": 106.3, "chf_funding_advantage_vs_jpy_bp": 68.3}, {"d": "2025-06-30", "fr_bund_bp": 72.1, "btp_bund_bp": 98.2, "uk_bund_bp": 200.6, "de_jp_10y_bp": 109.9, "chf_funding_advantage_vs_jpy_bp": 73.3}, {"d": "2025-07-31", "fr_bund_bp": 72.9, "btp_bund_bp": 90.6, "uk_bund_bp": 196.1, "de_jp_10y_bp": 108.6, "chf_funding_advantage_vs_jpy_bp": 81.3}, {"d": "2025-08-31", "fr_bund_bp": 74.7, "btp_bund_bp": 86.5, "uk_bund_bp": 196.4, "de_jp_10y_bp": 107.3, "chf_funding_advantage_vs_jpy_bp": 83.4}, {"d": "2025-09-30", "fr_bund_bp": 81.7, "btp_bund_bp": 86.6, "uk_bund_bp": 199.5, "de_jp_10y_bp": 104.8, "chf_funding_advantage_vs_jpy_bp": 87.8}, {"d": "2025-10-31", "fr_bund_bp": 82.2, "btp_bund_bp": 82.4, "uk_bund_bp": 195.4, "de_jp_10y_bp": 96.3, "chf_funding_advantage_vs_jpy_bp": 87.3}, {"d": "2025-11-30", "fr_bund_bp": 78.2, "btp_bund_bp": 80.1, "uk_bund_bp": 184.1, "de_jp_10y_bp": 85.3, "chf_funding_advantage_vs_jpy_bp": 85.4}, {"d": "2025-12-31", "fr_bund_bp": 74.6, "btp_bund_bp": 73.8, "uk_bund_bp": 166.8, "de_jp_10y_bp": 75.4, "chf_funding_advantage_vs_jpy_bp": 112.1}, {"d": "2026-01-31", "fr_bund_bp": 72.3, "btp_bund_bp": 68.5, "uk_bund_bp": 164.4, "de_jp_10y_bp": 56.7, "chf_funding_advantage_vs_jpy_bp": 115.5}, {"d": "2026-02-28", "fr_bund_bp": 65.5, "btp_bund_bp": 64.3, "uk_bund_bp": 168.7, "de_jp_10y_bp": 63.5, "chf_funding_advantage_vs_jpy_bp": 127.3}, {"d": "2026-03-31", "fr_bund_bp": 73.0, "btp_bund_bp": 82.3, "uk_bund_bp": 179.1, "de_jp_10y_bp": 56.5, "chf_funding_advantage_vs_jpy_bp": 131.0}, {"d": "2026-04-30", "fr_bund_bp": 72.9, "btp_bund_bp": 81.7, "uk_bund_bp": 182.0, "de_jp_10y_bp": 48.6, "chf_funding_advantage_vs_jpy_bp": 128.2}, {"d": "2026-05-31", "fr_bund_bp": 69.4, "btp_bund_bp": 79.2, "uk_bund_bp": 189.5, "de_jp_10y_bp": 39.7, "chf_funding_advantage_vs_jpy_bp": 131.4}, {"d": "2026-06-30", "fr_bund_bp": 71.0, "btp_bund_bp": 76.4, "uk_bund_bp": 182.6, "de_jp_10y_bp": 30.0, "chf_funding_advantage_vs_jpy_bp": null}, {"d": "2026-07-31", "fr_bund_bp": null, "btp_bund_bp": null, "uk_bund_bp": null, "de_jp_10y_bp": null, "chf_funding_advantage_vs_jpy_bp": null}, {"d": "2026-08-31", "fr_bund_bp": null, "btp_bund_bp": null, "uk_bund_bp": null, "de_jp_10y_bp": null, "chf_funding_advantage_vs_jpy_bp": null}], "fx": [{"d": "2006-01-31", "ej": 142.1, "eg": 0.6823}, {"d": "2006-02-28", "ej": 138.12, "eg": 0.6799}, {"d": "2006-03-31", "ej": 142.61, "eg": 0.6979}, {"d": "2006-04-30", "ej": 143.65, "eg": 0.6929}, {"d": "2006-05-31", "ej": 144.06, "eg": 0.6851}, {"d": "2006-06-30", "ej": 146.33, "eg": 0.6911}, {"d": "2006-07-31", "ej": 146.07, "eg": 0.6831}, {"d": "2006-08-31", "ej": 150.13, "eg": 0.6725}, {"d": "2006-09-30", "ej": 149.69, "eg": 0.6779}, {"d": "2006-10-31", "ej": 149.21, "eg": 0.6693}, {"d": "2006-11-30", "ej": 153.23, "eg": 0.6734}, {"d": "2006-12-31", "ej": 157.07, "eg": 0.6738}, {"d": "2007-01-31", "ej": 157.3, "eg": 0.6628}, {"d": "2007-02-28", "ej": 156.55, "eg": 0.6746}, {"d": "2007-03-31", "ej": 157.22, "eg": 0.6794}, {"d": "2007-04-30", "ej": 163.16, "eg": 0.683}, {"d": "2007-05-31", "ej": 163.8, "eg": 0.6795}, {"d": "2007-06-30", "ej": 166.82, "eg": 0.6739}, {"d": "2007-07-31", "ej": 163.34, "eg": 0.6733}, {"d": "2007-08-31", "ej": 158.0, "eg": 0.6765}, {"d": "2007-09-30", "ej": 163.48, "eg": 0.6974}, {"d": "2007-10-31", "ej": 166.77, "eg": 0.6963}, {"d": "2007-11-30", "ej": 163.07, "eg": 0.7142}, {"d": "2007-12-31", "ej": 163.13, "eg": 0.7359}, {"d": "2008-01-31", "ej": 158.41, "eg": 0.746}, {"d": "2008-02-29", "ej": 158.23, "eg": 0.7645}, {"d": "2008-03-31", "ej": 157.81, "eg": 0.796}, {"d": "2008-04-30", "ej": 162.73, "eg": 0.7844}, {"d": "2008-05-31", "ej": 164.1, "eg": 0.7861}, {"d": "2008-06-30", "ej": 167.2, "eg": 0.7911}, {"d": "2008-07-31", "ej": 168.52, "eg": 0.7871}, {"d": "2008-08-31", "ej": 159.44, "eg": 0.8064}, {"d": "2008-09-30", "ej": 149.17, "eg": 0.7909}, {"d": "2008-10-31", "ej": 124.64, "eg": 0.7845}, {"d": "2008-11-30", "ej": 121.18, "eg": 0.8271}, {"d": "2008-12-31", "ej": 126.37, "eg": 0.9521}, {"d": "2009-01-31", "ej": 115.02, "eg": 0.8884}, {"d": "2009-02-28", "ej": 123.76, "eg": 0.8869}, {"d": "2009-03-31", "ej": 131.48, "eg": 0.9273}, {"d": "2009-04-30", "ej": 130.8, "eg": 0.8949}, {"d": "2009-05-31", "ej": 134.97, "eg": 0.8741}, {"d": "2009-06-30", "ej": 135.18, "eg": 0.8522}, {"d": "2009-07-31", "ej": 134.99, "eg": 0.8544}, {"d": "2009-08-31", "ej": 133.23, "eg": 0.8799}, {"d": "2009-09-30", "ej": 130.92, "eg": 0.9141}, {"d": "2009-10-31", "ej": 133.53, "eg": 0.8954}, {"d": "2009-11-30", "ej": 129.13, "eg": 0.9138}, {"d": "2009-12-31", "ej": 133.4, "eg": 0.8865}, {"d": "2010-01-31", "ej": 125.36, "eg": 0.8664}, {"d": "2010-02-28", "ej": 121.36, "eg": 0.8964}, {"d": "2010-03-31", "ej": 126.33, "eg": 0.8907}, {"d": "2010-04-30", "ej": 125.36, "eg": 0.869}, {"d": "2010-05-31", "ej": 112.32, "eg": 0.8535}, {"d": "2010-06-30", "ej": 108.76, "eg": 0.8223}, {"d": "2010-07-31", "ej": 112.96, "eg": 0.8317}, {"d": "2010-08-31", "ej": 106.84, "eg": 0.8272}, {"d": "2010-09-30", "ej": 113.61, "eg": 0.8646}, {"d": "2010-10-31", "ej": 111.82, "eg": 0.8673}, {"d": "2010-11-30", "ej": 108.93, "eg": 0.8368}, {"d": "2010-12-31", "ej": 108.37, "eg": 0.8621}, {"d": "2011-01-31", "ej": 112.42, "eg": 0.8549}, {"d": "2011-02-28", "ej": 113.02, "eg": 0.849}, {"d": "2011-03-31", "ej": 117.38, "eg": 0.8838}, {"d": "2011-04-30", "ej": 120.51, "eg": 0.888}, {"d": "2011-05-31", "ej": 116.86, "eg": 0.8745}, {"d": "2011-06-30", "ej": 117.11, "eg": 0.9039}, {"d": "2011-07-31", "ej": 111.05, "eg": 0.8744}, {"d": "2011-08-31", "ej": 110.21, "eg": 0.8855}, {"d": "2011-09-30", "ej": 103.61, "eg": 0.8608}, {"d": "2011-10-31", "ej": 108.74, "eg": 0.8641}, {"d": "2011-11-30", "ej": 104.37, "eg": 0.8566}, {"d": "2011-12-31", "ej": 99.87, "eg": 0.835}, {"d": "2012-01-31", "ej": 99.65, "eg": 0.8286}, {"d": "2012-02-29", "ej": 108.34, "eg": 0.8375}, {"d": "2012-03-31", "ej": 109.89, "eg": 0.8342}, {"d": "2012-04-30", "ej": 105.58, "eg": 0.8153}, {"d": "2012-05-31", "ej": 96.8, "eg": 0.8026}, {"d": "2012-06-30", "ej": 101.1, "eg": 0.8076}, {"d": "2012-07-31", "ej": 96.18, "eg": 0.7851}, {"d": "2012-08-31", "ej": 98.49, "eg": 0.7929}, {"d": "2012-09-30", "ej": 100.17, "eg": 0.7969}, {"d": "2012-10-31", "ej": 103.59, "eg": 0.8043}, {"d": "2012-11-30", "ej": 107.38, "eg": 0.8118}, {"d": "2012-12-31", "ej": 114.24, "eg": 0.8108}, {"d": "2013-01-31", "ej": 123.99, "eg": 0.8567}, {"d": "2013-02-28", "ej": 120.8, "eg": 0.8609}, {"d": "2013-03-31", "ej": 120.68, "eg": 0.8435}, {"d": "2013-04-30", "ej": 128.41, "eg": 0.8474}, {"d": "2013-05-31", "ej": 130.96, "eg": 0.8553}, {"d": "2013-06-30", "ej": 129.07, "eg": 0.8554}, {"d": "2013-07-31", "ej": 130.63, "eg": 0.8751}, {"d": "2013-08-31", "ej": 129.61, "eg": 0.8531}, {"d": "2013-09-30", "ej": 133.04, "eg": 0.8366}, {"d": "2013-10-31", "ej": 133.36, "eg": 0.846}, {"d": "2013-11-30", "ej": 139.39, "eg": 0.831}, {"d": "2013-12-31", "ej": 145.02, "eg": 0.8314}, {"d": "2014-01-31", "ej": 138.08, "eg": 0.8207}, {"d": "2014-02-28", "ej": 140.93, "eg": 0.8242}, {"d": "2014-03-31", "ej": 141.88, "eg": 0.8262}, {"d": "2014-04-30", "ej": 141.67, "eg": 0.8215}, {"d": "2014-05-31", "ej": 138.81, "eg": 0.8136}, {"d": "2014-06-30", "ej": 138.65, "eg": 0.8004}, {"d": "2014-07-31", "ej": 137.58, "eg": 0.7928}, {"d": "2014-08-31", "ej": 136.76, "eg": 0.7929}, {"d": "2014-09-30", "ej": 138.48, "eg": 0.7785}, {"d": "2014-10-31", "ej": 140.45, "eg": 0.7832}, {"d": "2014-11-30", "ej": 147.64, "eg": 0.7954}, {"d": "2014-12-31", "ej": 145.03, "eg": 0.7768}, {"d": "2015-01-31", "ej": 132.59, "eg": 0.7514}, {"d": "2015-02-28", "ej": 134.05, "eg": 0.7252}, {"d": "2015-03-31", "ej": 128.85, "eg": 0.7233}, {"d": "2015-04-30", "ej": 133.79, "eg": 0.7282}, {"d": "2015-05-31", "ej": 136.3, "eg": 0.7192}, {"d": "2015-06-30", "ej": 136.19, "eg": 0.7092}, {"d": "2015-07-31", "ej": 136.68, "eg": 0.7054}, {"d": "2015-08-31", "ej": 135.74, "eg": 0.7286}, {"d": "2015-09-30", "ej": 133.73, "eg": 0.7384}, {"d": "2015-10-31", "ej": 133.28, "eg": 0.7149}, {"d": "2015-11-30", "ej": 130.14, "eg": 0.7021}, {"d": "2015-12-31", "ej": 130.6, "eg": 0.7364}, {"d": "2016-01-31", "ej": 131.12, "eg": 0.7637}, {"d": "2016-02-29", "ej": 122.7, "eg": 0.7804}, {"d": "2016-03-31", "ej": 128.05, "eg": 0.792}, {"d": "2016-04-30", "ej": 122.3, "eg": 0.7823}, {"d": "2016-05-31", "ej": 123.32, "eg": 0.7663}, {"d": "2016-06-30", "ej": 113.38, "eg": 0.8331}, {"d": "2016-07-31", "ej": 114.27, "eg": 0.8416}, {"d": "2016-08-31", "ej": 115.23, "eg": 0.849}, {"d": "2016-09-30", "ej": 113.74, "eg": 0.8635}, {"d": "2016-10-31", "ej": 115.18, "eg": 0.8976}, {"d": "2016-11-30", "ej": 120.95, "eg": 0.8475}, {"d": "2016-12-31", "ej": 123.23, "eg": 0.8553}, {"d": "2017-01-31", "ej": 121.67, "eg": 0.8577}, {"d": "2017-02-28", "ej": 118.99, "eg": 0.8544}, {"d": "2017-03-31", "ej": 119.19, "eg": 0.8533}, {"d": "2017-04-30", "ej": 121.41, "eg": 0.8421}, {"d": "2017-05-31", "ej": 124.39, "eg": 0.8707}, {"d": "2017-06-30", "ej": 128.26, "eg": 0.8781}, {"d": "2017-07-31", "ej": 130.54, "eg": 0.8962}, {"d": "2017-08-31", "ej": 130.91, "eg": 0.9229}, {"d": "2017-09-30", "ej": 133.06, "eg": 0.8814}, {"d": "2017-10-31", "ej": 132.36, "eg": 0.877}, {"d": "2017-11-30", "ej": 133.61, "eg": 0.8809}, {"d": "2017-12-31", "ej": 135.48, "eg": 0.8886}, {"d": "2018-01-31", "ej": 135.85, "eg": 0.8758}, {"d": "2018-02-28", "ej": 130.19, "eg": 0.8852}, {"d": "2018-03-31", "ej": 130.84, "eg": 0.8783}, {"d": "2018-04-30", "ej": 131.94, "eg": 0.878}, {"d": "2018-05-31", "ej": 126.89, "eg": 0.8782}, {"d": "2018-06-30", "ej": 129.28, "eg": 0.8848}, {"d": "2018-07-31", "ej": 130.97, "eg": 0.8919}, {"d": "2018-08-31", "ej": 128.69, "eg": 0.8945}, {"d": "2018-09-30", "ej": 131.89, "eg": 0.8904}, {"d": "2018-10-31", "ej": 127.89, "eg": 0.8868}, {"d": "2018-11-30", "ej": 128.56, "eg": 0.8865}, {"d": "2018-12-31", "ej": 125.67, "eg": 0.8976}, {"d": "2019-01-31", "ej": 124.67, "eg": 0.872}, {"d": "2019-02-28", "ej": 126.74, "eg": 0.8572}, {"d": "2019-03-31", "ej": 124.27, "eg": 0.8616}, {"d": "2019-04-30", "ej": 124.78, "eg": 0.8596}, {"d": "2019-05-31", "ej": 121.15, "eg": 0.8834}, {"d": "2019-06-30", "ej": 122.66, "eg": 0.8953}, {"d": "2019-07-31", "ej": 120.85, "eg": 0.9108}, {"d": "2019-08-31", "ej": 116.81, "eg": 0.9033}, {"d": "2019-09-30", "ej": 117.89, "eg": 0.8862}, {"d": "2019-10-31", "ej": 120.57, "eg": 0.8621}, {"d": "2019-11-30", "ej": 120.62, "eg": 0.8516}, {"d": "2019-12-31", "ej": 122.0, "eg": 0.8461}, {"d": "2020-01-31", "ej": 120.24, "eg": 0.8399}, {"d": "2020-02-29", "ej": 118.94, "eg": 0.8609}, {"d": "2020-03-31", "ej": 118.46, "eg": 0.8845}, {"d": "2020-04-30", "ej": 116.93, "eg": 0.8676}, {"d": "2020-05-31", "ej": 119.7, "eg": 0.9015}, {"d": "2020-06-30", "ej": 121.1, "eg": 0.9085}, {"d": "2020-07-31", "ej": 125.05, "eg": 0.9002}, {"d": "2020-08-31", "ej": 126.48, "eg": 0.8935}, {"d": "2020-09-30", "ej": 123.77, "eg": 0.9073}, {"d": "2020-10-31", "ej": 121.76, "eg": 0.9006}, {"d": "2020-11-30", "ej": 124.71, "eg": 0.8958}, {"d": "2020-12-31", "ej": 126.2, "eg": 0.8952}, {"d": "2021-01-31", "ej": 126.98, "eg": 0.8843}, {"d": "2021-02-28", "ej": 128.96, "eg": 0.8671}, {"d": "2021-03-31", "ej": 129.89, "eg": 0.8513}, {"d": "2021-04-30", "ej": 131.52, "eg": 0.8693}, {"d": "2021-05-31", "ej": 133.93, "eg": 0.8595}, {"d": "2021-06-30", "ej": 131.57, "eg": 0.8582}, {"d": "2021-07-31", "ej": 130.15, "eg": 0.8527}, {"d": "2021-08-31", "ej": 129.86, "eg": 0.8584}, {"d": "2021-09-30", "ej": 129.08, "eg": 0.8595}, {"d": "2021-10-31", "ej": 131.73, "eg": 0.8441}, {"d": "2021-11-30", "ej": 127.79, "eg": 0.8517}, {"d": "2021-12-31", "ej": 130.35, "eg": 0.8384}, {"d": "2022-01-31", "ej": 129.18, "eg": 0.8343}, {"d": "2022-02-28", "ej": 129.2, "eg": 0.8364}, {"d": "2022-03-31", "ej": 134.71, "eg": 0.8434}, {"d": "2022-04-30", "ej": 136.81, "eg": 0.8386}, {"d": "2022-05-31", "ej": 137.93, "eg": 0.85}, {"d": "2022-06-30", "ej": 142.05, "eg": 0.8608}, {"d": "2022-07-31", "ej": 135.94, "eg": 0.8374}, {"d": "2022-08-31", "ej": 139.59, "eg": 0.8642}, {"d": "2022-09-30", "ej": 141.57, "eg": 0.8787}, {"d": "2022-10-31", "ej": 146.92, "eg": 0.8584}, {"d": "2022-11-30", "ej": 143.81, "eg": 0.863}, {"d": "2022-12-31", "ej": 141.01, "eg": 0.8858}, {"d": "2023-01-31", "ej": 141.34, "eg": 0.881}, {"d": "2023-02-28", "ej": 144.28, "eg": 0.8767}, {"d": "2023-03-31", "ej": 144.33, "eg": 0.879}, {"d": "2023-04-30", "ej": 150.13, "eg": 0.8774}, {"d": "2023-05-31", "ej": 148.92, "eg": 0.8595}, {"d": "2023-06-30", "ej": 157.76, "eg": 0.8592}, {"d": "2023-07-31", "ej": 156.68, "eg": 0.8571}, {"d": "2023-08-31", "ej": 157.9, "eg": 0.8557}, {"d": "2023-09-30", "ej": 158.16, "eg": 0.8665}, {"d": "2023-10-31", "ej": 160.06, "eg": 0.8709}, {"d": "2023-11-30", "ej": 161.3, "eg": 0.863}, {"d": "2023-12-31", "ej": 155.89, "eg": 0.8681}, {"d": "2024-01-31", "ej": 158.77, "eg": 0.8525}, {"d": "2024-02-29", "ej": 162.0, "eg": 0.8555}, {"d": "2024-03-31", "ej": 163.18, "eg": 0.8539}, {"d": "2024-04-30", "ej": 168.32, "eg": 0.8538}, {"d": "2024-05-31", "ej": 170.49, "eg": 0.8515}, {"d": "2024-06-30", "ej": 172.32, "eg": 0.8474}, {"d": "2024-07-31", "ej": 162.76, "eg": 0.8429}, {"d": "2024-08-31", "ej": 161.42, "eg": 0.8422}, {"d": "2024-09-30", "ej": 159.65, "eg": 0.8318}, {"d": "2024-10-31", "ej": 165.38, "eg": 0.8444}, {"d": "2024-11-30", "ej": 158.64, "eg": 0.8305}, {"d": "2024-12-31", "ej": 162.89, "eg": 0.8267}, {"d": "2025-01-31", "ej": 161.11, "eg": 0.8355}, {"d": "2025-02-28", "ej": 156.7, "eg": 0.8261}, {"d": "2025-03-31", "ej": 161.83, "eg": 0.8372}, {"d": "2025-04-30", "ej": 161.87, "eg": 0.8505}, {"d": "2025-05-31", "ej": 163.6, "eg": 0.8425}, {"d": "2025-06-30", "ej": 169.69, "eg": 0.8577}, {"d": "2025-07-31", "ej": 172.15, "eg": 0.8647}, {"d": "2025-08-31", "ej": 171.8, "eg": 0.8656}, {"d": "2025-09-30", "ej": 173.64, "eg": 0.8729}, {"d": "2025-10-31", "ej": 177.79, "eg": 0.8782}, {"d": "2025-11-30", "ej": 181.16, "eg": 0.8762}, {"d": "2025-12-31", "ej": 184.02, "eg": 0.8728}, {"d": "2026-01-31", "ej": 183.43, "eg": 0.8657}, {"d": "2026-02-28", "ej": 184.48, "eg": 0.8786}, {"d": "2026-03-31", "ej": 183.23, "eg": 0.8736}, {"d": "2026-04-30", "ej": 183.75, "eg": 0.8637}, {"d": "2026-05-31", "ej": 185.96, "eg": 0.8667}, {"d": "2026-06-30", "ej": 185.65, "eg": 0.8611}, {"d": "2026-07-31", "ej": 183.34, "eg": 0.8552}, {"d": "2026-08-31", "ej": 182.1, "eg": 0.8563}]}</script>
+<script>
+(function () {
+  "use strict";
+  var DATA = JSON.parse(document.getElementById("chart-data").textContent);
+  var tt = document.getElementById("tt");
+  var NS = "http://www.w3.org/2000/svg";
+
+  var STATE_META = {
+    both_below:        { label: "Both below (feared)",  color: "var(--s2)" },
+    eurjpy_below_only: { label: "EUR/JPY below only",   color: "var(--s1)" },
+    eurgbp_below_only: { label: "EUR/GBP below only",   color: "var(--s3)" },
+    both_above:        { label: "Both above (calm)",    color: "var(--s4)" }
+  };
+
+  function el(n, attrs) {
+    var e = document.createElementNS(NS, n);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function showTip(evt, html) {
+    tt.innerHTML = html;
+    tt.style.opacity = "1";
+    var r = tt.getBoundingClientRect();
+    var x = evt.clientX + 14, y = evt.clientY + 14;
+    if (x + r.width > window.innerWidth - 8) x = evt.clientX - r.width - 14;
+    if (y + r.height > window.innerHeight - 8) y = evt.clientY - r.height - 14;
+    tt.style.left = x + "px";
+    tt.style.top = y + "px";
+  }
+  function hideTip() { tt.style.opacity = "0"; }
+  function fmt(v, d) { return v === null || v === undefined ? "—" : v.toFixed(d === undefined ? 1 : d); }
+  function ty(s) { return new Date(s + "T00:00:00Z").getTime(); }
+
+  // ---------- Figure 1: bucket correction ----------
+  (function () {
+    var host = document.getElementById("fig-buckets");
+    if (!host) return;
+    var rows = [
+      { k: "both_above",        before: 2548, after: 179 },
+      { k: "both_below",        before: 2394, after: 2394 },
+      { k: "eurjpy_below_only", before: 2586, after: 2586 },
+      { k: "eurgbp_below_only", before: 2,    after: 2 }
+    ];
+    var W = 900, rowH = 54, padT = 34, padB = 20, padL = 168, padR = 74;
+    var H = padT + rows.length * rowH + padB;
+    var max = 2600;
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Regime day counts before and after the NaN fix" });
+    var plotW = W - padL - padR;
+    function x(v) { return padL + (v / max) * plotW; }
+
+    [0, 650, 1300, 1950, 2600].forEach(function (v) {
+      svg.appendChild(el("line", { x1: x(v), x2: x(v), y1: padT - 12, y2: H - padB, class: "gridline" }));
+      var t = el("text", { x: x(v), y: padT - 18, "text-anchor": "middle", class: "axis-t" });
+      t.setAttribute("style", "font-family:var(--font-ui);font-size:10.5px;fill:var(--muted)");
+      t.textContent = v.toLocaleString();
+      svg.appendChild(t);
+    });
+
+    rows.forEach(function (r, i) {
+      var yTop = padT + i * rowH;
+      var lab = el("text", { x: padL - 12, y: yTop + 20, "text-anchor": "end" });
+      lab.setAttribute("style", "font-family:var(--font-ui);font-size:12px;font-weight:600;fill:var(--ink)");
+      lab.textContent = STATE_META[r.k].label;
+      svg.appendChild(lab);
+
+      // before (hollow) and after (filled)
+      var bh = 13;
+      var b = el("rect", { x: padL, y: yTop + 2, width: Math.max(2, x(r.before) - padL), height: bh, rx: 3,
+        fill: "none", stroke: "var(--muted)", "stroke-width": 1.5, "stroke-dasharray": "3 2" });
+      svg.appendChild(b);
+      var a = el("rect", { x: padL, y: yTop + 2 + bh + 2, width: Math.max(2, x(r.after) - padL), height: bh, rx: 3,
+        fill: STATE_META[r.k].color });
+      svg.appendChild(a);
+
+      var chg = r.before === r.after ? "unchanged" : "−" + (r.before - r.after).toLocaleString() + " days";
+      var v = el("text", { x: Math.max(x(r.before), x(r.after)) + 8, y: yTop + 21 });
+      v.setAttribute("style", "font-family:var(--font-mono);font-size:11px;font-variant-numeric:tabular-nums;fill:" +
+        (r.before === r.after ? "var(--muted)" : "var(--crit)"));
+      v.textContent = chg;
+      svg.appendChild(v);
+
+      var hit = el("rect", { x: padL, y: yTop, width: plotW, height: rowH - 6, fill: "transparent" });
+      hit.addEventListener("mousemove", function (e) {
+        showTip(e, '<div class="tt-h">' + STATE_META[r.k].label + '</div>' +
+          '<div class="tt-r"><span>Before fix</span><span>' + r.before.toLocaleString() + '</span></div>' +
+          '<div class="tt-r"><span>After fix</span><span>' + r.after.toLocaleString() + '</span></div>');
+      });
+      hit.addEventListener("mouseleave", hideTip);
+      svg.appendChild(hit);
+    });
+
+    var lg = document.createElement("div");
+    lg.className = "legend";
+    lg.innerHTML =
+      '<span><span class="swatch" style="border:1.5px dashed var(--muted);background:transparent"></span>Before fix (calendar days)</span>' +
+      '<span><span class="swatch" style="background:var(--ink-2)"></span>After fix (observed trading days)</span>';
+    host.appendChild(lg);
+    host.appendChild(svg);
+  })();
+
+  // ---------- shared time scale helpers ----------
+  function timeAxis(svg, x0, x1, t0, t1, yBase, yTop) {
+    for (var yr = 2006; yr <= 2026; yr += 2) {
+      var t = ty(yr + "-01-01");
+      if (t < t0 || t > t1) continue;
+      var px = x0 + ((t - t0) / (t1 - t0)) * (x1 - x0);
+      svg.appendChild(el("line", { x1: px, x2: px, y1: yTop, y2: yBase, class: "gridline" }));
+      var lab = el("text", { x: px, y: yBase + 15, "text-anchor": "middle" });
+      lab.setAttribute("style", "font-family:var(--font-ui);font-size:10.5px;fill:var(--muted)");
+      lab.textContent = yr;
+      svg.appendChild(lab);
+    }
+  }
+
+  // ---------- Figure 2: regime ribbon + FX small multiples ----------
+  (function () {
+    var host = document.getElementById("fig-regime");
+    if (!host) return;
+    var runs = DATA.runs, fx = DATA.fx;
+    var t0 = ty("2006-01-01"), t1 = ty("2026-08-13");
+    var W = 900, padL = 52, padR = 96;
+    var ribbonY = 8, ribbonH = 26;
+    var panelH = 116, gap = 26;
+    var H = ribbonY + ribbonH + gap + panelH + gap + panelH + 26;
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Threshold regime through time with EUR/JPY and EUR/GBP" });
+    var x0 = padL, x1 = W - padR;
+    function X(t) { return x0 + ((t - t0) / (t1 - t0)) * (x1 - x0); }
+
+    // ribbon
+    runs.forEach(function (r) {
+      var a = X(ty(r[0])), b = X(ty(r[1]));
+      var rect = el("rect", { x: a, y: ribbonY, width: Math.max(1.2, b - a), height: ribbonH,
+        fill: STATE_META[r[2]] ? STATE_META[r[2]].color : "var(--muted)" });
+      rect.addEventListener("mousemove", function (e) {
+        showTip(e, '<div class="tt-h">' + (STATE_META[r[2]] ? STATE_META[r[2]].label : r[2]) + '</div>' +
+          '<div class="tt-r"><span>From</span><span>' + r[0] + '</span></div>' +
+          '<div class="tt-r"><span>To</span><span>' + r[1] + '</span></div>');
+      });
+      rect.addEventListener("mouseleave", hideTip);
+      svg.appendChild(rect);
+    });
+    var rl = el("text", { x: x0 - 8, y: ribbonY + 18, "text-anchor": "end" });
+    rl.setAttribute("style", "font-family:var(--font-ui);font-size:10.5px;font-weight:600;fill:var(--muted)");
+    rl.textContent = "State";
+    svg.appendChild(rl);
+
+    function panel(key, top, lo, hi, thr, title, dec) {
+      function Y(v) { return top + panelH - ((v - lo) / (hi - lo)) * panelH; }
+      [lo, thr, hi].forEach(function (v) {
+        var isThr = v === thr;
+        svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(v), y2: Y(v),
+          stroke: isThr ? "var(--crit)" : "var(--grid)", "stroke-width": isThr ? 1.5 : 1,
+          "stroke-dasharray": isThr ? "5 3" : "none" }));
+        var lab = el("text", { x: x0 - 8, y: Y(v) + 3.5, "text-anchor": "end" });
+        lab.setAttribute("style", "font-family:var(--font-mono);font-size:10px;font-variant-numeric:tabular-nums;fill:" +
+          (isThr ? "var(--crit)" : "var(--muted)"));
+        lab.textContent = v.toFixed(dec);
+        svg.appendChild(lab);
+      });
+      var d = "", started = false;
+      fx.forEach(function (p) {
+        if (p[key] === null) { started = false; return; }
+        var px = X(ty(p.d)), py = Y(p[key]);
+        d += (started ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1);
+        started = true;
+      });
+      svg.appendChild(el("path", { d: d, class: "serie", stroke: "var(--ink)" }));
+      var t = el("text", { x: x1 + 10, y: top + 12 });
+      t.setAttribute("style", "font-family:var(--font-ui);font-size:11.5px;font-weight:700;fill:var(--ink)");
+      t.textContent = title;
+      svg.appendChild(t);
+      var t2 = el("text", { x: x1 + 10, y: top + 27 });
+      t2.setAttribute("style", "font-family:var(--font-ui);font-size:10px;fill:var(--crit)");
+      t2.textContent = "threshold " + thr.toFixed(dec);
+      svg.appendChild(t2);
+      return Y;
+    }
+
+    var topA = ribbonY + ribbonH + gap;
+    panel("ej", topA, 90, 200, 180, "EUR/JPY", 0);
+    var topB = topA + panelH + gap;
+    panel("eg", topB, 0.66, 0.96, 0.85, "EUR/GBP", 2);
+    timeAxis(svg, x0, x1, t0, t1, topB + panelH, ribbonY);
+
+    var lg = document.createElement("div");
+    lg.className = "legend";
+    // Only legend states that actually render: the 2-day eurgbp_below_only run is
+    // below the drawing threshold, and a legend key with no mark is a false promise.
+    var present = {};
+    runs.forEach(function (r) { present[r[2]] = true; });
+    Object.keys(STATE_META).forEach(function (k) {
+      if (!present[k]) return;
+      lg.innerHTML += '<span><span class="swatch" style="background:' + STATE_META[k].color + '"></span>' +
+        STATE_META[k].label + '</span>';
+    });
+    host.appendChild(lg);
+    host.appendChild(svg);
+  })();
+
+  // ---------- Figure 3: European spreads ----------
+  (function () {
+    var host = document.getElementById("fig-spreads");
+    if (!host) return;
+    var sp = DATA.spreads;
+    var series = [
+      { k: "fr_bund_bp",  label: "France OAT–Bund",  color: "var(--s1)" },
+      { k: "btp_bund_bp", label: "Italy BTP–Bund",   color: "var(--s2)" },
+      { k: "uk_bund_bp",  label: "UK Gilt–Bund",     color: "var(--s3)" }
+    ];
+    var t0 = ty("2006-01-01"), t1 = ty("2026-08-13");
+    var W = 900, padL = 52, padR = 128, padT = 14, padB = 30;
+    var H = 300;
+    var lo = 0, hi = 550;
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "French, Italian and UK spreads over Bunds since 2006" });
+    var x0 = padL, x1 = W - padR, yB = H - padB;
+    function X(t) { return x0 + ((t - t0) / (t1 - t0)) * (x1 - x0); }
+    function Y(v) { return padT + (1 - (v - lo) / (hi - lo)) * (yB - padT); }
+
+    // both_above shading
+    var sa = X(ty("2025-11-17")), sb = X(ty("2026-08-07"));
+    svg.appendChild(el("rect", { x: sa, y: padT, width: Math.max(2, sb - sa), height: yB - padT,
+      fill: "var(--s4)", opacity: "0.16" }));
+    var sl = el("text", { x: sa - 6, y: padT + 12, "text-anchor": "end" });
+    sl.setAttribute("style", "font-family:var(--font-ui);font-size:10px;fill:var(--muted)");
+    sl.textContent = "both_above →";
+    svg.appendChild(sl);
+
+    [0, 100, 200, 300, 400, 500].forEach(function (v) {
+      svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(v), y2: Y(v), class: "gridline" }));
+      var lab = el("text", { x: x0 - 8, y: Y(v) + 3.5, "text-anchor": "end" });
+      lab.setAttribute("style", "font-family:var(--font-mono);font-size:10px;font-variant-numeric:tabular-nums;fill:var(--muted)");
+      lab.textContent = v;
+      svg.appendChild(lab);
+    });
+    timeAxis(svg, x0, x1, t0, t1, yB, padT);
+
+    series.forEach(function (s) {
+      var d = "", started = false, last = null;
+      sp.forEach(function (p) {
+        if (p[s.k] === null || p[s.k] === undefined) { started = false; return; }
+        var px = X(ty(p.d)), py = Y(p[s.k]);
+        d += (started ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1);
+        started = true; last = { x: px, y: py, v: p[s.k] };
+      });
+      svg.appendChild(el("path", { d: d, class: "serie", stroke: s.color }));
+      if (last) {
+        svg.appendChild(el("circle", { cx: last.x, cy: last.y, r: 3.5, fill: s.color,
+          stroke: "var(--ground)", "stroke-width": 2 }));
+        var lab = el("text", { x: x1 + 10, y: last.y + 3.5 });
+        lab.setAttribute("style", "font-family:var(--font-ui);font-size:10.5px;font-weight:600;fill:var(--ink)");
+        lab.textContent = s.label;
+        svg.appendChild(lab);
+      }
+    });
+
+    // crosshair
+    var ch = el("line", { x1: 0, x2: 0, y1: padT, y2: yB, stroke: "var(--muted)", "stroke-width": 1, opacity: "0" });
+    svg.appendChild(ch);
+    var hit = el("rect", { x: x0, y: padT, width: x1 - x0, height: yB - padT, fill: "transparent" });
+    hit.addEventListener("mousemove", function (e) {
+      var box = svg.getBoundingClientRect();
+      var px = ((e.clientX - box.left) / box.width) * W;
+      var t = t0 + ((px - x0) / (x1 - x0)) * (t1 - t0);
+      var best = null, bd = Infinity;
+      sp.forEach(function (p) { var dd = Math.abs(ty(p.d) - t); if (dd < bd) { bd = dd; best = p; } });
+      if (!best) return;
+      ch.setAttribute("x1", X(ty(best.d))); ch.setAttribute("x2", X(ty(best.d)));
+      ch.setAttribute("opacity", "0.55");
+      var html = '<div class="tt-h">' + best.d.slice(0, 7) + '</div>';
+      series.forEach(function (s) {
+        html += '<div class="tt-r"><span>' + s.label + '</span><span>' + fmt(best[s.k]) + ' bp</span></div>';
+      });
+      showTip(e, html);
+    });
+    hit.addEventListener("mouseleave", function () { hideTip(); ch.setAttribute("opacity", "0"); });
+    svg.appendChild(hit);
+
+    var lg = document.createElement("div");
+    lg.className = "legend";
+    series.forEach(function (s) {
+      lg.innerHTML += '<span><span class="swatch" style="background:' + s.color + '"></span>' + s.label + '</span>';
+    });
+    host.appendChild(lg);
+    host.appendChild(svg);
+  })();
+
+  // ---------- Figure 4: R-squared ----------
+  (function () {
+    var host = document.getElementById("fig-r2");
+    if (!host) return;
+    var rows = [
+      { label: "ECB fragmentation", dep: "d_btp_bund_bp", v: 0.465 },
+      { label: "UK vs US long end", dep: "d_us_uk_10y_bp", v: 0.072 },
+      { label: "CHF substitute carry", dep: "d_chf_funding_adv", v: 0.046 },
+      { label: "France weak link", dep: "d_fr_bund_bp", v: 0.035 }
+    ];
+    var W = 900, rowH = 40, padT = 28, padB = 16, padL = 178, padR = 64;
+    var H = padT + rows.length * rowH + padB;
+    var max = 0.5;
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "R squared by model" });
+    var plotW = W - padL - padR;
+    function x(v) { return padL + (v / max) * plotW; }
+
+    [0, 0.1, 0.2, 0.3, 0.4, 0.5].forEach(function (v) {
+      svg.appendChild(el("line", { x1: x(v), x2: x(v), y1: padT - 10, y2: H - padB, class: "gridline" }));
+      var t = el("text", { x: x(v), y: padT - 16, "text-anchor": "middle" });
+      t.setAttribute("style", "font-family:var(--font-ui);font-size:10.5px;fill:var(--muted)");
+      t.textContent = v.toFixed(1);
+      svg.appendChild(t);
+    });
+
+    rows.forEach(function (r, i) {
+      var yTop = padT + i * rowH;
+      var lab = el("text", { x: padL - 12, y: yTop + 17, "text-anchor": "end" });
+      lab.setAttribute("style", "font-family:var(--font-ui);font-size:12px;font-weight:600;fill:var(--ink)");
+      lab.textContent = r.label;
+      svg.appendChild(lab);
+      var bar = el("rect", { x: padL, y: yTop + 4, width: Math.max(2, x(r.v) - padL), height: 19, rx: 3,
+        fill: i === 0 ? "var(--s2)" : "var(--s1)", opacity: i === 0 ? "1" : "0.62" });
+      svg.appendChild(bar);
+      var v = el("text", { x: x(r.v) + 9, y: yTop + 18 });
+      v.setAttribute("style", "font-family:var(--font-mono);font-size:11px;font-variant-numeric:tabular-nums;fill:var(--ink-2)");
+      v.textContent = r.v.toFixed(3);
+      svg.appendChild(v);
+      var hit = el("rect", { x: padL, y: yTop, width: plotW, height: rowH - 4, fill: "transparent" });
+      hit.addEventListener("mousemove", function (e) {
+        showTip(e, '<div class="tt-h">' + r.label + '</div>' +
+          '<div class="tt-r"><span>Dependent</span><span>' + r.dep + '</span></div>' +
+          '<div class="tt-r"><span>R²</span><span>' + r.v.toFixed(3) + '</span></div>' +
+          '<div class="tt-r"><span>n</span><span>245</span></div>');
+      });
+      hit.addEventListener("mouseleave", hideTip);
+      svg.appendChild(hit);
+    });
+    host.appendChild(svg);
+  })();
+})();
+</script>

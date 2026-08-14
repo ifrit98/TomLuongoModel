@@ -1,0 +1,7 @@
+event_date,event_type,source_note
+2022-07-21,ECB fragmentation policy,ECB TPI announcement; calibration event for BTP-Bund intervention-state interpretation
+2024-03-19,BOJ regime shift,End of negative-rate/YCC-era regime; verify exact surprise component for intraday work
+2024-07-31,BOJ policy decision,BOJ rate normalization event; verify consensus surprise and exact timestamp
+2026-03-19,BOJ policy decision,BOJ at around 1 percent; verify surprise component
+2026-06-16,BOJ policy decision,Official BOJ decision; freeze exact time and consensus surprise
+2026-08-05,US-Japan support/intervention candidate,Tom/Lepard episode window; identify exact instrument transaction and timestamp before causal inference
