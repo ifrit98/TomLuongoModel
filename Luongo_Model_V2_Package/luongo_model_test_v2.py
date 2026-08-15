@@ -1075,9 +1075,17 @@ def hac_regression(
 def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> pd.DataFrame:
     """Jordà-style local projections of BTP-Bund on yen appreciation vs EUR.
 
-    Negative horizons act as a pre-trend check: if the spread response is already
-    significant before the shock (h < 0), the causal read that yen strength widens
-    Italian fragmentation risk, rather than merely co-moving with it, does not hold.
+    Negative horizons are a pre-trend diagnostic, not a "pre-trend check that
+    passes": dep = y_{t+h} - y_{t-1}, so a negative coefficient at h<0 means
+    the level *before* t-1 was lower than the t-1 baseline, i.e. the spread
+    was already rising into the shock. h=-1 is a normalization point, not an
+    estimate: dep = y_{t-1} - y_{t-1} is identically zero by construction, so
+    that row is emitted with coef=0.0 (true, structural) but std_err/z/
+    pvalue/ci_low/ci_high/nobs all NaN and estimable=False, so it cannot be
+    mistaken for a tight, significant null. This is a deliberate, documented
+    deviation from a literal reading of the brief's dep-var formula, made
+    because a fully-populated zero-CI row at h=-1 would misrepresent the
+    normalization point as the most confident finding in the chart.
     """
     required = {"btp_bund_bp", "jpy_appreciation_vs_eur", "vix"}
     if sm is None or not required.issubset(monthly.columns):
@@ -1085,9 +1093,34 @@ def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> 
 
     work = monthly.copy()
     work["d_vix"] = work["vix"].diff()
+    regressor_sd = float(work["jpy_appreciation_vs_eur"].std(skipna=True))
 
     rows: list[dict[str, object]] = []
     for h in range(-max_horizon, max_horizon + 1):
+        if h == -1:
+            # dep = y_{t-1} - y_{t-1} is identically zero by construction: this
+            # is the normalization point of the local projection, not a null
+            # estimate. Emitting a fitted std_err=0 / ci width=0 row here would
+            # render as the single most authoritative point in the chart,
+            # sitting exactly on zero one month before the shock -- precisely
+            # where a pre-trend claim would be made or refuted. Mark it
+            # explicitly as not estimable instead.
+            rows.append(
+                {
+                    "horizon": h,
+                    "coef": 0.0,
+                    "std_err": float("nan"),
+                    "z": float("nan"),
+                    "pvalue": float("nan"),
+                    "ci_low": float("nan"),
+                    "ci_high": float("nan"),
+                    "nobs": float("nan"),
+                    "coef_per_1sd_bp": 0.0,
+                    "estimable": False,
+                }
+            )
+            continue
+
         dep = work["btp_bund_bp"].shift(-h) - work["btp_bund_bp"].shift(1)
         frame = pd.DataFrame(
             {
@@ -1124,12 +1157,22 @@ def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> 
                 "ci_low": float(ci_low),
                 "ci_high": float(ci_high),
                 "nobs": int(len(frame)),
+                # coef is bp per 1.0 (i.e. 100%) log-return move in
+                # jpy_appreciation_vs_eur; rescale to bp per 1 in-sample
+                # standard deviation of the regressor, which is the size of
+                # move that actually occurs month to month.
+                "coef_per_1sd_bp": coef * regressor_sd,
+                "estimable": True,
             }
         )
 
     if not rows:
         return pd.DataFrame()
-    return pd.DataFrame(rows).sort_values("horizon").reset_index(drop=True)
+    columns = [
+        "horizon", "coef", "std_err", "z", "pvalue", "ci_low", "ci_high",
+        "nobs", "coef_per_1sd_bp", "estimable",
+    ]
+    return pd.DataFrame(rows)[columns].sort_values("horizon").reset_index(drop=True)
 
 
 def run_regressions(monthly: pd.DataFrame, output_dir: Path) -> None:
@@ -1277,6 +1320,7 @@ def plot_outputs(
     mof: pd.DataFrame,
     tic: pd.DataFrame,
     output_dir: Path,
+    local_projection: pd.DataFrame | None = None,
 ) -> None:
     chart_dir = output_dir / "charts"
     chart_dir.mkdir(parents=True, exist_ok=True)
@@ -1422,20 +1466,42 @@ def plot_outputs(
             ax.set_ylabel("Gold log return")
             save_plot(fig, chart_dir / "09_gold_dollar_quadrants.png")
 
-    local_projection = local_projection_btp_on_jpy(monthly)
+    if local_projection is None:
+        local_projection = local_projection_btp_on_jpy(monthly)
     if not local_projection.empty:
+        lp = local_projection.sort_values("horizon")
+        estimable = lp["estimable"].astype(bool)
         fig, ax = plt.subplots(figsize=(10, 5.5))
-        ax.plot(local_projection["horizon"], local_projection["coef"], marker="o")
+        # Coefficient path stays continuous through h=-1 (coef=0.0 there is a
+        # true structural value, not an estimate), but the CI band uses
+        # ci_low/ci_high which are NaN at h=-1 -- matplotlib breaks both the
+        # line and the fill at NaN, so the band shows a gap rather than
+        # pinching to a false zero-width interval at that point.
+        ax.plot(lp["horizon"], lp["coef"], linewidth=1.5, color="tab:blue", zorder=2)
+        ax.scatter(
+            lp.loc[estimable, "horizon"], lp.loc[estimable, "coef"],
+            marker="o", color="tab:blue", zorder=3,
+        )
+        ax.scatter(
+            lp.loc[~estimable, "horizon"], lp.loc[~estimable, "coef"],
+            marker="o", facecolors="white", edgecolors="tab:blue",
+            linewidths=1.5, s=60, zorder=4,
+        )
+        for _, row in lp.loc[~estimable].iterrows():
+            ax.annotate(
+                "normalization (0 by construction)",
+                xy=(row["horizon"], row["coef"]),
+                xytext=(row["horizon"], row["coef"] - 0.12 * max(1.0, lp["coef"].abs().max())),
+                ha="center", va="top", fontsize=8, color="tab:blue",
+            )
         ax.fill_between(
-            local_projection["horizon"],
-            local_projection["ci_low"],
-            local_projection["ci_high"],
-            alpha=0.2,
+            lp["horizon"], lp["ci_low"], lp["ci_high"],
+            alpha=0.2, color="tab:blue",
         )
         ax.axhline(0, linewidth=1)
         ax.axvline(0, linewidth=1, linestyle="--")
         ax.set_title("Local projection: BTP-Bund response to yen appreciation vs EUR")
-        ax.set_ylabel("BTP-Bund response (bp)")
+        ax.set_ylabel("BTP-Bund response, bp per 1.0 (100%) JPY/EUR log-return appreciation")
         ax.set_xlabel("Months from yen appreciation")
         save_plot(fig, chart_dir / "10_local_projection_btp_on_jpy.png")
 
@@ -1605,13 +1671,19 @@ def live_run(args: argparse.Namespace, package_dir: Path, output_dir: Path) -> N
     run_regressions(monthly, output_dir)
 
     local_projection = local_projection_btp_on_jpy(monthly)
-    local_projection.to_csv(output_dir / "local_projection_btp_on_jpy.csv", index=False)
-    LOGGER.info(
-        "Wrote local projection of BTP-Bund on yen appreciation (%d rows) to %s",
-        len(local_projection), output_dir / "local_projection_btp_on_jpy.csv",
-    )
+    if not local_projection.empty:
+        local_projection.to_csv(output_dir / "local_projection_btp_on_jpy.csv", index=False)
+        LOGGER.info(
+            "Wrote local projection of BTP-Bund on yen appreciation (%d rows) to %s",
+            len(local_projection), output_dir / "local_projection_btp_on_jpy.csv",
+        )
+    else:
+        LOGGER.warning(
+            "Local projection of BTP-Bund on yen appreciation produced no rows "
+            "(missing columns or statsmodels unavailable); skipping CSV write."
+        )
 
-    plot_outputs(daily, monthly, cftc, mof, tic, output_dir)
+    plot_outputs(daily, monthly, cftc, mof, tic, output_dir, local_projection=local_projection)
     write_metadata(output_dir, args, source_status)
 
     LOGGER.info("Live baseline complete. Review %s", output_dir)
