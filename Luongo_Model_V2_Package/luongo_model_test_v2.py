@@ -673,11 +673,9 @@ def build_daily_panel(fred: pd.DataFrame, optional: pd.DataFrame) -> pd.DataFram
         panel["jpy_per_eur"] = panel["jpy_per_usd"] * panel["usd_per_eur"]
         panel["eurjpy_return"] = np.log(panel["jpy_per_eur"]).diff()
         panel["jpy_appreciation_vs_eur"] = -panel["eurjpy_return"]
-        # .where preserves missingness: a bare `<` comparison evaluates NaN to False,
+        # NaN-preserving indicator: a bare `<` comparison evaluates NaN to False,
         # which would silently code every weekend and holiday as "not below threshold".
-        panel["eurjpy_below_180"] = (
-            (panel["jpy_per_eur"] < 180.0).astype(float).where(panel["jpy_per_eur"].notna())
-        )
+        panel["eurjpy_below_180"] = _below_threshold_indicator(panel["jpy_per_eur"], 180.0)
         panel["eurjpy_distance_to_180_pct"] = (panel["jpy_per_eur"] / 180.0 - 1.0) * 100
 
     if {"usd_per_eur", "usd_per_gbp"}.issubset(panel.columns):
@@ -685,9 +683,7 @@ def build_daily_panel(fred: pd.DataFrame, optional: pd.DataFrame) -> pd.DataFram
         panel["gbp_per_eur"] = panel["usd_per_eur"] / panel["usd_per_gbp"]
         panel["eurgbp_return"] = np.log(panel["gbp_per_eur"]).diff()
         panel["gbp_appreciation_vs_eur"] = -panel["eurgbp_return"]
-        panel["eurgbp_below_085"] = (
-            (panel["gbp_per_eur"] < 0.85).astype(float).where(panel["gbp_per_eur"].notna())
-        )
+        panel["eurgbp_below_085"] = _below_threshold_indicator(panel["gbp_per_eur"], 0.85)
         panel["eurgbp_distance_to_085_pct"] = (panel["gbp_per_eur"] / 0.85 - 1.0) * 100
 
     if {"chf_per_usd", "usd_per_eur"}.issubset(panel.columns):
@@ -868,9 +864,11 @@ def run_event_study(
 def _below_threshold_indicator(series: pd.Series, threshold: float) -> pd.Series:
     """Below-threshold indicator that preserves NaN on unobserved dates.
 
-    Same idiom as build_daily_panel's eurjpy_below_180 / eurgbp_below_085: a bare
-    `<` comparison evaluates NaN to False, which would silently code every
-    weekend/holiday as "not below threshold" and mis-state regime counts.
+    Centralizes the idiom used by build_daily_panel's eurjpy_below_180 /
+    eurgbp_below_085 and by placebo_threshold_tests: a bare `<` comparison
+    evaluates NaN to False, which would silently code every weekend/holiday
+    as "not below threshold" and mis-state regime counts (this is the exact
+    bug class that once mis-stated a below-threshold count by 14x).
     """
     return (series < threshold).astype(float).where(series.notna())
 
@@ -978,6 +976,13 @@ def placebo_threshold_tests(daily: pd.DataFrame, monthly: pd.DataFrame) -> pd.Da
         ("gbp_per_eur", [0.83, 0.84, 0.85, 0.86, 0.87], 0.85),
     ]
     spread_cols = ["btp_bund_bp", "fr_bund_bp"]
+    columns = [
+        "pair", "threshold", "is_prespecified", "days_below", "days_above",
+        "crossings_below", "crossings_above", "first_date_below", "last_date_below",
+        "median_vix_below", "median_vix_above", "months_below", "months_above",
+    ]
+    for spread_col in spread_cols:
+        columns += [f"median_{spread_col}_below", f"median_{spread_col}_above", f"{spread_col}_gap"]
 
     rows: list[dict[str, object]] = []
     for col, thresholds, prespecified in specs:
@@ -1029,6 +1034,22 @@ def placebo_threshold_tests(daily: pd.DataFrame, monthly: pd.DataFrame) -> pd.Da
             below_months = monthly_state.index[monthly_state == "below"] if not monthly_state.empty else pd.DatetimeIndex([])
             above_months = monthly_state.index[monthly_state == "above"] if not monthly_state.empty else pd.DatetimeIndex([])
 
+            # Sample size actually behind the monthly medians below: a labelled month
+            # only counts if at least one spread column has real data in it. This is
+            # frequently a much thinner sample than days_below/days_above (daily) or
+            # even than the count of labelled months itself, since the spread series
+            # are monthly-only and can be missing for stretches within a state.
+            present_spread_cols = [c for c in spread_cols if c in monthly.columns]
+            if present_spread_cols and not monthly_state.empty:
+                any_spread_present = monthly[present_spread_cols].notna().any(axis=1)
+                months_below = int(any_spread_present.reindex(below_months).fillna(False).sum())
+                months_above = int(any_spread_present.reindex(above_months).fillna(False).sum())
+            else:
+                months_below = 0
+                months_above = 0
+            row["months_below"] = months_below
+            row["months_above"] = months_above
+
             for spread_col in spread_cols:
                 if spread_col in monthly.columns:
                     below_vals = monthly.reindex(below_months)[spread_col]
@@ -1047,8 +1068,8 @@ def placebo_threshold_tests(daily: pd.DataFrame, monthly: pd.DataFrame) -> pd.Da
             rows.append(row)
 
     if not rows:
-        return pd.DataFrame()
-    return pd.DataFrame(rows).sort_values(["pair", "threshold"]).reset_index(drop=True)
+        return pd.DataFrame(columns=columns)
+    return pd.DataFrame(rows)[columns].sort_values(["pair", "threshold"]).reset_index(drop=True)
 
 
 def hac_regression(
@@ -1087,13 +1108,22 @@ def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> 
     because a fully-populated zero-CI row at h=-1 would misrepresent the
     normalization point as the most confident finding in the chart.
     """
+    columns = [
+        "horizon", "coef", "std_err", "z", "pvalue", "ci_low", "ci_high",
+        "ci_low_per_1sd_bp", "ci_high_per_1sd_bp", "nobs", "coef_per_1sd_bp", "estimable",
+    ]
+
+    def _empty_with_headers() -> pd.DataFrame:
+        empty = pd.DataFrame(columns=columns)
+        empty["nobs"] = empty["nobs"].astype("Int64")
+        return empty
+
     required = {"btp_bund_bp", "jpy_appreciation_vs_eur", "vix"}
     if sm is None or not required.issubset(monthly.columns):
-        return pd.DataFrame()
+        return _empty_with_headers()
 
     work = monthly.copy()
     work["d_vix"] = work["vix"].diff()
-    regressor_sd = float(work["jpy_appreciation_vs_eur"].std(skipna=True))
 
     rows: list[dict[str, object]] = []
     for h in range(-max_horizon, max_horizon + 1):
@@ -1114,7 +1144,9 @@ def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> 
                     "pvalue": float("nan"),
                     "ci_low": float("nan"),
                     "ci_high": float("nan"),
-                    "nobs": float("nan"),
+                    "ci_low_per_1sd_bp": float("nan"),
+                    "ci_high_per_1sd_bp": float("nan"),
+                    "nobs": pd.NA,
                     "coef_per_1sd_bp": 0.0,
                     "estimable": False,
                 }
@@ -1147,6 +1179,13 @@ def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> 
         pvalue = float(model.pvalues["jpy_appreciation_vs_eur"])
         ci_low, ci_high = model.conf_int().loc["jpy_appreciation_vs_eur"]
 
+        # Computed on this horizon's own estimation sample (frame), not the full
+        # monthly column: each horizon drops a different set of rows via dropna(),
+        # so the regressor's in-sample SD shifts slightly horizon to horizon.
+        # Using one column-wide SD for every horizon would misscale the per-SD
+        # columns by up to ~1.4% depending on horizon.
+        regressor_sd = float(frame["jpy_appreciation_vs_eur"].std(skipna=True))
+
         rows.append(
             {
                 "horizon": h,
@@ -1157,22 +1196,26 @@ def local_projection_btp_on_jpy(monthly: pd.DataFrame, max_horizon: int = 6) -> 
                 "ci_low": float(ci_low),
                 "ci_high": float(ci_high),
                 "nobs": int(len(frame)),
-                # coef is bp per 1.0 (i.e. 100%) log-return move in
-                # jpy_appreciation_vs_eur; rescale to bp per 1 in-sample
-                # standard deviation of the regressor, which is the size of
-                # move that actually occurs month to month.
+                # coef/ci_low/ci_high are bp per 1.0 (i.e. 100%) log-return move in
+                # jpy_appreciation_vs_eur; rescale to bp per 1 in-sample standard
+                # deviation of the regressor, which is the size of move that
+                # actually occurs month to month. z and p are scale-invariant and
+                # are not rescaled.
                 "coef_per_1sd_bp": coef * regressor_sd,
+                "ci_low_per_1sd_bp": float(ci_low) * regressor_sd,
+                "ci_high_per_1sd_bp": float(ci_high) * regressor_sd,
                 "estimable": True,
             }
         )
 
     if not rows:
-        return pd.DataFrame()
-    columns = [
-        "horizon", "coef", "std_err", "z", "pvalue", "ci_low", "ci_high",
-        "nobs", "coef_per_1sd_bp", "estimable",
-    ]
-    return pd.DataFrame(rows)[columns].sort_values("horizon").reset_index(drop=True)
+        return _empty_with_headers()
+    result = pd.DataFrame(rows)[columns].sort_values("horizon").reset_index(drop=True)
+    # nobs is int for every estimable horizon but NaN at h=-1 (not estimable); a
+    # plain int column would upcast the whole column to float (e.g. 241.0) once
+    # that NaN is present. The nullable Int64 dtype keeps it reading as an integer.
+    result["nobs"] = result["nobs"].astype("Int64")
+    return result
 
 
 def run_regressions(monthly: pd.DataFrame, output_dir: Path) -> None:
@@ -1308,7 +1351,12 @@ def create_scorecard(
     return pd.DataFrame(rows)
 
 def save_plot(fig: plt.Figure, path: Path) -> None:
-    fig.tight_layout()
+    if fig._suptitle is not None:
+        # Reserve top margin for the figure-level suptitle so tight_layout's
+        # normal (no-suptitle) sizing doesn't run the subtitle/ax-title into it.
+        fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.93))
+    else:
+        fig.tight_layout()
     fig.savefig(path, dpi=170, bbox_inches="tight")
     plt.close(fig)
 
@@ -1500,7 +1548,21 @@ def plot_outputs(
         )
         ax.axhline(0, linewidth=1)
         ax.axvline(0, linewidth=1, linestyle="--")
-        ax.set_title("Local projection: BTP-Bund response to yen appreciation vs EUR")
+        fig.suptitle(
+            "Local projection: BTP-Bund response to yen appreciation vs EUR",
+            fontsize=13, y=0.98,
+        )
+        # h=0 is same-month co-movement, not a post-shock response -- the exact
+        # distinction a local projection exists to draw -- and the bands are
+        # pointwise HAC CIs with no correction for testing 13 horizons at once
+        # (at Bonferroni 0.05/13 only h=0 survives; h=+1 fails by a hair). This
+        # caveat must live on the chart itself, not only in an internal report,
+        # since external readers only ever see the chart and CSV.
+        ax.set_title(
+            "h=0 is contemporaneous; 95% pointwise HAC CIs, "
+            "no multiplicity adjustment across 13 horizons",
+            fontsize=9, color="dimgray", pad=10,
+        )
         ax.set_ylabel("BTP-Bund response, bp per 1.0 (100%) JPY/EUR log-return appreciation")
         ax.set_xlabel("Months from yen appreciation")
         save_plot(fig, chart_dir / "10_local_projection_btp_on_jpy.png")
@@ -1670,9 +1732,14 @@ def live_run(args: argparse.Namespace, package_dir: Path, output_dir: Path) -> N
     scorecard.to_csv(output_dir / "falsification_scorecard.csv", index=False)
     run_regressions(monthly, output_dir)
 
+    # Always write a properly-headed frame, mirroring placebo's unconditional write
+    # above: writing only on non-empty would leave a stale CSV from a prior run
+    # sitting in the same output dir looking current, and an unconditional write of
+    # an empty-but-headed frame is self-describing (empty rows, real headers) rather
+    # than a silent 0-byte file.
     local_projection = local_projection_btp_on_jpy(monthly)
+    local_projection.to_csv(output_dir / "local_projection_btp_on_jpy.csv", index=False)
     if not local_projection.empty:
-        local_projection.to_csv(output_dir / "local_projection_btp_on_jpy.csv", index=False)
         LOGGER.info(
             "Wrote local projection of BTP-Bund on yen appreciation (%d rows) to %s",
             len(local_projection), output_dir / "local_projection_btp_on_jpy.csv",
@@ -1680,7 +1747,7 @@ def live_run(args: argparse.Namespace, package_dir: Path, output_dir: Path) -> N
     else:
         LOGGER.warning(
             "Local projection of BTP-Bund on yen appreciation produced no rows "
-            "(missing columns or statsmodels unavailable); skipping CSV write."
+            "(missing columns or statsmodels unavailable); wrote header-only CSV."
         )
 
     plot_outputs(daily, monthly, cftc, mof, tic, output_dir, local_projection=local_projection)

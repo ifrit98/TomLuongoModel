@@ -55,6 +55,25 @@ The optional market-data file may be omitted for the public-only baseline.
 - `threshold_crossings.csv`
 - `threshold_crossing_event_study.csv`
 - `threshold_regime_summary.csv`
+- `placebo_threshold_tests.csv` — EUR/JPY 180 and EUR/GBP 0.85 tested against four
+  neighbouring placebo levels each. `days_below`/`days_above` are daily observation
+  counts; `months_below`/`months_above` report the (usually much thinner) number of
+  labelled months that actually have BTP-Bund/OAT-Bund data behind the monthly
+  median/gap columns — always check these before quoting a gap figure.
+- `local_projection_btp_on_jpy.csv` — Jordà-style local projections of BTP-Bund on
+  yen appreciation vs EUR, horizons h=-6..+6. `coef`/`std_err`/`ci_low`/`ci_high` are
+  bp per 1.0 (100%) monthly log-return move; `coef_per_1sd_bp`/`ci_low_per_1sd_bp`/
+  `ci_high_per_1sd_bp` are the same estimates rescaled to bp per 1 in-sample standard
+  deviation of the regressor (the size of move that actually occurs month to month).
+  Do not mix the two unit families — the unscaled and per-SD confidence intervals are
+  roughly a 34x scale apart. h=0 is contemporaneous same-month co-movement, not a
+  post-shock response. The 95% CIs are pointwise across the 13 tested horizons with
+  no multiplicity adjustment: at a Bonferroni-corrected 0.05/13 = 0.0038 threshold
+  only h=0 (p=6.2e-4) survives, and h=+1 (p=0.0039) fails by a hair. h=-1 is a
+  normalization point (dep is identically zero by construction), not an estimate;
+  its `std_err`/`ci_low`/`ci_high`/`nobs` are emitted as null and `estimable=False`.
+- `charts/10_local_projection_btp_on_jpy.png` — chart form of the above, with the
+  same h=0/multiplicity caveat printed as a subtitle on the chart itself.
 - revised `event_study.csv`
 - revised `falsification_scorecard.csv`
 - revised `regression_report.txt`
